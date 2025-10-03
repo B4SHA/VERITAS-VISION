@@ -2,7 +2,6 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
-import { googleSearch } from '@genkit-ai/google-search';
 import { z } from 'zod';
 
 const NewsSleuthInputSchema = z.object({
@@ -37,7 +36,7 @@ const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
-    tools: [googleSearch],
+    tools: [{ "google_search": {} }],
     prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided text, URL, or headline and deliver a comprehensive credibility report, grounded in real-time web search results.
 
 **Input:**
