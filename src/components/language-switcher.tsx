@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { languages as lang } from 'lucide-react';
+import { Languages as LanguageIcon } from 'lucide-react';
 
 export function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
@@ -19,7 +19,7 @@ export function LanguageSwitcher() {
         className="w-full justify-start gap-2"
         aria-label="Select Language"
       >
-        <lang.Icon className="size-4" />
+        <LanguageIcon className="size-4" />
         <span className="group-data-[collapsible=icon]:hidden">
           <SelectValue placeholder="Language" />
         </span>
