@@ -60,6 +60,9 @@ Audio for analysis is provided in the content.`;
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [audioPart, { text: prompt }] }],
         tools: [{ "google_search": {} }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
     });
 
     const response = result.response;
