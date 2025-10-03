@@ -1,0 +1,110 @@
+
+{
+  "navigation": {
+    "newsSleuth": "News Sleuth",
+    "videoIntegrity": "Video Integrity",
+    "audioAuthenticator": "Audio Authenticator",
+    "imageVerifier": "Image Verifier"
+  },
+  "home": {
+    "heroTitle": "Uncover the Truth",
+    "heroSubtitle": "AI-powered content analysis for news, video, and audio. Your shield against misinformation.",
+    "tryNowTitle": "Try It Now",
+    "launchButton": "Launch",
+    "features": [
+      {
+        "title": "News Sleuth",
+        "description": "Analyze news articles, headlines, or URLs to uncover biases, check facts, and assess overall credibility. News Sleuth cross-references claims with reputable sources to give you a detailed report.",
+        "featureList": [
+          "Credibility scoring from 0-100",
+          "Detection of sensationalism and logical fallacies",
+          "Source and author reputation analysis",
+          "Identification of political, ideological, or commercial biases"
+        ]
+      },
+      {
+        "title": "Video Integrity",
+        "description": "Scrutinize videos for signs of deepfakery, manipulation, and synthetic content. Our tool performs a multi-modal analysis of video and audio tracks to ensure what you're seeing is real.",
+        "featureList": [
+          "Deepfake detection (e.g., face swapping)",
+          "Analysis of video edits, CGI, and temporal inconsistencies",
+          "Voice cloning and synthetic audio detection",
+          "Frame-by-frame visual artifact analysis"
+        ]
+      },
+      {
+        "title": "Audio Authenticator",
+        "description": "Verify the authenticity of audio recordings. This tool detects AI-generated speech, voice cloning, and other manipulations by analyzing vocal patterns, background noise, and digital fingerprints.",
+        "featureList": [
+          "Voice cloning and AI speech synthesis detection",
+          "Analysis of tonal and cadence inconsistencies",
+          "Background noise and environment validation",
+          "Speech-to-text transcription and content analysis"
+        ]
+      },
+      {
+        "title": "Image Verifier",
+        "description": "Examine images for signs of AI generation or digital tampering. The Image Verifier uses forensic analysis to spot artifacts, inconsistencies, and check the image's origin and context.",
+        "featureList": [
+          "AI-generated image detection (GANs, diffusion models)",
+          "Detection of Photoshop and other manipulation techniques",
+          "Reverse image search for contextual analysis",
+          "Optical Character Recognition (OCR) and text analysis"
+        ]
+      }
+    ]
+  },
+  "newsSleuth": {
+    "title": "News Sleuth",
+    "description": "Paste the text of a news article, provide a URL, or enter a headline to instantly analyze its credibility.",
+    "inputTitle": "Submit an Article for Analysis",
+    "inputDescription": "Choose an input method and provide the content to be analyzed.",
+    "inputTextLabel": "Article Text",
+    "inputUrlLabel": "Article URL",
+    "inputHeadlineLabel": "Article Headline",
+    "inputTextPlaceholder": "Paste the full text of the article here...",
+    "inputUrlPlaceholder": "https://example.com/news-article",
+    "inputHeadlinePlaceholder": "Enter the headline here...",
+    "analyzeButton": "Analyze Credibility",
+    "reportTitle": "Credibility Report",
+    "reportDescription": "An AI-generated analysis of the article's likely credibility.",
+    "analyzingText": "The News Sleuth is on the case... Analyzing sources, checking facts, and identifying biases.",
+    "pendingText": "Your credibility report will appear here once the analysis is complete."
+  },
+  "videoIntegrity": {
+    "title": "Video Integrity",
+    "description": "Upload a video to analyze it for deepfakes, manipulations, and other signs of synthetic media.",
+    "inputTitle": "Upload a Video for Analysis",
+    "inputDescription": "Select a video file from your device (Max 50MB).",
+    "inputFileLabel": "Video File",
+    "analyzeButton": "Analyze Video",
+    "reportTitle": "Video Forensics Report",
+    "reportDescription": "An AI-generated analysis of the video's authenticity and integrity.",
+    "analyzingText": "Performing multi-modal analysis... Examining video frames and audio tracks for inconsistencies.",
+    "pendingText": "Your video analysis report will appear here once complete."
+  },
+  "audioAuthenticator": {
+    "title": "Audio Authenticator",
+    "description": "Upload an audio file to check for AI-generated voices, cloning, and other manipulation artifacts.",
+    "inputTitle": "Upload Audio for Authentication",
+    "inputDescription": "Select an audio file from your device (Max 10MB).",
+    "inputFileLabel": "Audio File",
+    "analyzeButton": "Authenticate Audio",
+    "reportTitle": "Audio Forensics Report",
+    "reportDescription": "An AI-generated analysis of the audio's authenticity.",
+    "analyzingText": "Scanning audio frequencies and patterns for tell-tale signs of synthesis or manipulation...",
+    "pendingText": "Your audio forensics report will appear here once complete."
+  },
+  "imageVerifier": {
+    "title": "Image Verifier",
+    "description": "Upload an image to detect signs of AI generation, digital manipulation, and misleading context.",
+    "inputTitle": "Upload Image for Verification",
+    "inputDescription": "Select an image file from your device (Max 10MB).",
+    "inputFileLabel": "Image File",
+    "analyzeButton": "Verify Image",
+    "reportTitle": "Image Forensics Report",
+    "reportDescription": "An AI-generated analysis of the image's authenticity and context.",
+    "analyzingText": "Analyzing pixels, metadata, and context... Searching for inconsistencies and digital fingerprints.",
+    "pendingText": "Your image forensics report will appear here once complete."
+  }
+}

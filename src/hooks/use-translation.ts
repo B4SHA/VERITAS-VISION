@@ -1,46 +1,47 @@
 
-import { useLanguage, type Language } from '@/context/language-context';
-import { translations } from '@/data/translations';
+'use client';
 
-function getTranslatedValue(lang: Language, key: string): any {
+import { useLanguage, type Language } from '@/context/language-context';
+import en from '@/lib/translations/en.json';
+import hi from '@/lib/translations/hi.json';
+import bn from '@/lib/translations/bn.json';
+import mr from '@/lib/translations/mr.json';
+import te from '@/lib/translations/te.json';
+import ta from '@/lib/translations/ta.json';
+import { useMemo } from 'react';
+
+const translations = { en, hi, bn, mr, te, ta };
+
+function getTranslatedValue(langData: any, key: string): any {
     const keyParts = key.split('.');
-    let currentObject: any = translations;
+    let currentObject: any = langData;
 
     for (const part of keyParts) {
         if (currentObject && typeof currentObject === 'object' && part in currentObject) {
             currentObject = currentObject[part];
         } else {
-            // Key path is invalid, return the key itself as a fallback
-            return key;
+            return key; // Key path is invalid, return the key itself as a fallback
         }
     }
     
-    // After iterating, the final object should have the language key.
-    if (currentObject && typeof currentObject === 'object' && lang in currentObject) {
-        return currentObject[lang];
-    }
-    
-    // Fallback if the final lookup fails for any reason
-    return key;
+    return currentObject;
 }
-
 
 export function useTranslation() {
   const { language } = useLanguage();
 
+  const activeTranslations = useMemo(() => translations[language] || en, [language]);
+
   const t = (key: string): string => {
-    const value = getTranslatedValue(language, key);
-    // Ensure we always return a string for simple text translations
+    const value = getTranslatedValue(activeTranslations, key);
     if (typeof value === 'string') {
         return value;
     }
-    // If we get an object or something else, return the key as a safe fallback
     return key;
   };
 
   const getFeatures = (): Array<{title: string, description: string, featureList: string[]}> => {
-    // This function specifically gets the features array
-    return translations.home?.[language]?.features || [];
+    return activeTranslations.home.features || [];
   }
 
   const navigationLinks = [
