@@ -49,8 +49,6 @@ export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promis
 
   const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
-Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
-
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
     *   Examine each frame for artifacts related to deepfakes (e.g., unnatural facial movements, poor lip-syncing, edge anomalies).
@@ -71,14 +69,13 @@ You will perform a multi-modal analysis:
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
-Video for analysis is provided in the content.`;
+Video for analysis is provided in the content.
+
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
 
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [videoPart, { text: prompt }] }],
         tools: [{ "google_search": {} }],
-        generationConfig: {
-          responseMimeType: "application/json",
-        },
     });
 
     const response = result.response;

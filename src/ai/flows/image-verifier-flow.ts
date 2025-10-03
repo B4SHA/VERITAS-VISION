@@ -47,8 +47,6 @@ export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<
 
   const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
 
-Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
-
 You will perform the following analysis:
 1.  **AI Generation Detection**: Analyze the image for artifacts characteristic of AI image synthesis (e.g., GANs, diffusion models). Look for tell-tale signs in textures, backgrounds, lighting, and anatomical details.
 2.  **Manipulation Detection**: Look for evidence of digital alteration, such as cloning, splicing, or retouching. Analyze shadows, reflections, and perspectives for inconsistencies.
@@ -59,14 +57,13 @@ You will perform the following analysis:
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
-Image for analysis is provided in the content.`;
+Image for analysis is provided in the content.
+
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
 
   const result = await model.generateContent({
       contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
       tools: [{ "google_search": {} }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
   });
 
   const response = result.response;

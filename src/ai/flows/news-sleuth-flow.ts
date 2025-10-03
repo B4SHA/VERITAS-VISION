@@ -52,20 +52,16 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
 **Instructions:**
 1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
 2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
-3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
-
-The output language must be: **${input.language}**.
+3.  **GENERATE JSON REPORT**: The output language must be: **${input.language}**.
 
 Article Information for Analysis:
 ${articleInfo}
-`;
+
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
 
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{text: prompt}] }],
         tools: [{ "google_search": {} }],
-        generationConfig: {
-          responseMimeType: "application/json",
-        },
     });
 
     const response = result.response;
