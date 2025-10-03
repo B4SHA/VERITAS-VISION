@@ -1,8 +1,18 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+import { dataUriToGenerativePart } from '@/lib/utils';
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY is not set');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({
+  model: 'gemini-1.5-pro',
+});
+
 
 const ImageVerifierInputSchema = z.object({
   imageDataUri: z
@@ -31,14 +41,10 @@ export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 
 
-const imageVerifierRunner = ai.defineFlow(
-  {
-    name: 'imageVerifierRunner',
-    inputSchema: ImageVerifierInputSchema,
-    outputSchema: ImageVerifierOutputSchema,
-  },
-  async (input) => {
-    const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
+export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
+  const imagePart = dataUriToGenerativePart(input.imageDataUri);
+
+  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
 
 Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
@@ -54,31 +60,19 @@ The output language for the report and analysis must be in the language specifie
 
 Image for analysis is provided in the content.`;
 
-    const llmResponse = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
-      prompt: [
-        {
-          media: {
-            url: input.imageDataUri,
-          },
-        },
-        { text: prompt },
-      ],
-      output: {
-        schema: ImageVerifierOutputSchema,
-      },
-      tools: [{ name: 'googleSearch' }],
-    });
+  const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
+      tools: [{ "google_search": {} }],
+  });
 
-    const output = llmResponse.output();
-    if (!output) {
-      throw new Error('No output from model');
-    }
-    return output;
+  const response = result.response;
+  const text = response.text();
+
+  try {
+      const parsed = JSON.parse(text);
+      return ImageVerifierOutputSchema.parse(parsed);
+  } catch (e) {
+      console.error("Failed to parse LLM response:", text);
+      throw new Error("The AI returned an invalid response format.");
   }
-);
-
-
-export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
-    return await imageVerifierRunner(input);
 }

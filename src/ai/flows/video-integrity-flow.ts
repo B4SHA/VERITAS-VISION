@@ -1,8 +1,17 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+import { dataUriToGenerativePart } from '@/lib/utils';
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY is not set');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({
+  model: 'gemini-1.5-pro',
+});
 
 const VideoIntegrityInputSchema = z.object({
   videoDataUri: z
@@ -34,14 +43,10 @@ export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
 export type VideoIntegrityOutput = z.infer<typeof VideoIntegrityOutputSchema>;
 
 
-const videoIntegrityRunner = ai.defineFlow(
-  {
-    name: 'videoIntegrityRunner',
-    inputSchema: VideoIntegrityInputSchema,
-    outputSchema: VideoIntegrityOutputSchema,
-  },
-  async (input) => {
-    const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
+export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
+  const videoPart = dataUriToGenerativePart(input.videoDataUri);
+
+  const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
 Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
@@ -67,30 +72,19 @@ The output language for the report and analysis must be in the language specifie
 
 Video for analysis is provided in the content.`;
 
-    const llmResponse = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
-      prompt: [
-        {
-          media: {
-            url: input.videoDataUri,
-          },
-        },
-        { text: prompt },
-      ],
-      output: {
-        schema: VideoIntegrityOutputSchema,
-      },
-      tools: [{ name: 'googleSearch' }],
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [videoPart, { text: prompt }] }],
+        tools: [{ "google_search": {} }],
     });
 
-    const output = llmResponse.output();
-    if (!output) {
-      throw new Error('No output from model');
-    }
-    return output;
-  }
-);
+    const response = result.response;
+    const text = response.text();
 
-export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
-    return await videoIntegrityRunner(input);
+    try {
+        const parsed = JSON.parse(text);
+        return VideoIntegrityOutputSchema.parse(parsed);
+    } catch (e) {
+        console.error("Failed to parse LLM response:", text);
+        throw new Error("The AI returned an invalid response format.");
+    }
 }

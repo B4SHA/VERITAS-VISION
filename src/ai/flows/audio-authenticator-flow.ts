@@ -1,8 +1,17 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+import { dataUriToGenerativePart } from '@/lib/utils';
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY is not set');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({
+  model: 'gemini-1.5-pro',
+});
 
 const AudioAuthenticatorInputSchema = z.object({
   audioDataUri: z
@@ -26,14 +35,11 @@ const AudioAuthenticatorOutputSchema = z.object({
 export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSchema>;
 export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSchema>;
 
-const audioAuthenticatorRunner = ai.defineFlow(
-  {
-    name: 'audioAuthenticatorRunner',
-    inputSchema: AudioAuthenticatorInputSchema,
-    outputSchema: AudioAuthenticatorOutputSchema,
-  },
-  async (input) => {
-    const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
+
+export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
+  const audioPart = dataUriToGenerativePart(input.audioDataUri);
+
+  const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
 
 Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
@@ -50,31 +56,19 @@ The output language for the report and analysis must be in the language specifie
 
 Audio for analysis is provided in the content.`;
 
-    const llmResponse = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
-      prompt: [
-        {
-          media: {
-            url: input.audioDataUri,
-          },
-        },
-        { text: prompt },
-      ],
-      output: {
-        schema: AudioAuthenticatorOutputSchema,
-      },
-      tools: [{ name: 'googleSearch' }],
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [audioPart, { text: prompt }] }],
+        tools: [{ "google_search": {} }],
     });
 
-    const output = llmResponse.output();
-    if (!output) {
-      throw new Error('No output from model');
+    const response = result.response;
+    const text = response.text();
+
+    try {
+        const parsed = JSON.parse(text);
+        return AudioAuthenticatorOutputSchema.parse(parsed);
+    } catch (e) {
+        console.error("Failed to parse LLM response:", text);
+        throw new Error("The AI returned an invalid response format.");
     }
-    return output;
-  }
-);
-
-
-export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
-    return await audioAuthenticatorRunner(input);
 }

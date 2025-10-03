@@ -1,8 +1,16 @@
-
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('GEMINI_API_KEY is not set');
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({
+  model: 'gemini-1.5-pro',
+});
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -26,25 +34,19 @@ const NewsSleuthOutputSchema = z.object({
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-const newsSleuthRunner = ai.defineFlow(
-  {
-    name: 'newsSleuthRunner',
-    inputSchema: NewsSleuthInputSchema,
-    outputSchema: NewsSleuthOutputSchema,
-  },
-  async (input) => {
-    let articleInfo = '';
-    if (input.articleText) {
-      articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
-    }
-    if (input.articleHeadline) {
-      articleInfo += `Headline: "${input.articleHeadline}"\n`;
-    }
-    if (input.articleUrl) {
-      articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
-    }
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
+  let articleInfo = '';
+  if (input.articleText) {
+    articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
+  }
+  if (input.articleHeadline) {
+    articleInfo += `Headline: "${input.articleHeadline}"\n`;
+  }
+  if (input.articleUrl) {
+    articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
+  }
 
-    const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
+  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
 
 **Instructions:**
 1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
@@ -57,23 +59,19 @@ Article Information for Analysis:
 ${articleInfo}
 `;
 
-    const llmResponse = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
-      prompt: prompt,
-      output: {
-        schema: NewsSleuthOutputSchema,
-      },
-      tools: [{ name: 'googleSearch' }],
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{text: prompt}] }],
+        tools: [{ "google_search": {} }],
     });
 
-    const output = llmResponse.output();
-    if (!output) {
-      throw new Error('No output from model');
-    }
-    return output;
-  }
-);
+    const response = result.response;
+    const text = response.text();
 
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-  return await newsSleuthRunner(input);
+    try {
+        const parsed = JSON.parse(text);
+        return NewsSleuthOutputSchema.parse(parsed);
+    } catch (e) {
+        console.error("Failed to parse LLM response:", text);
+        throw new Error("The AI returned an invalid response format.");
+    }
 }
