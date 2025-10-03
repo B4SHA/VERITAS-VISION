@@ -5,6 +5,8 @@ import './globals.css';
 import { Header } from '@/components/header';
 import { cn } from '@/lib/utils';
 import { Inter, Space_Grotesk } from 'next/font/google';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { ThemeProvider } from '@/components/theme-provider';
 
 const fontSans = Inter({
   subsets: ['latin'],
@@ -33,11 +35,20 @@ export default function RootLayout({
         fontSans.variable,
         fontHeading.variable
       )}>
-        <LanguageProvider>
-          <Header />
-          {children}
-          <Toaster />
-        </LanguageProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SidebarProvider>
+            <LanguageProvider>
+              <Header />
+              {children}
+              <Toaster />
+            </LanguageProvider>
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

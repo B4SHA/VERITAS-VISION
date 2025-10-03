@@ -1,51 +1,58 @@
-"use client"
-
-import { useState } from "react";
-import { VideoIntegrity as VideoIntegrityTool } from "@/components/feature/video-integrity";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, ArrowRight, Video } from "lucide-react";
-import { useLanguage } from "@/hooks/use-language";
+import { Card, CardContent } from "@/components/ui/card";
+import { CheckCircle } from "lucide-react";
+import Link from "next/link";
 
 export default function VideoPage() {
-    const [showTool, setShowTool] = useState(false);
-    const { t } = useLanguage();
-
-    if (showTool) {
-        return <VideoIntegrityTool />;
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-foreground">
-            <div className="grid md:grid-cols-2 gap-16 items-center max-w-6xl mx-auto">
-                <div className="space-y-8">
-                    <h1 className="text-4xl md:text-6xl font-bold font-heading">
-                        {t('video_integrity_title')}
-                    </h1>
-                    <p className="text-lg text-muted-foreground">
-                        In the age of deepfakes, seeing isn't always believing. Upload a video, and our tool will perform a deep analysis to detect signs of manipulation, giving you a confidence score on its authenticity.
-                    </p>
-                    <ul className="space-y-4 text-base">
-                        <li className="flex items-start gap-3">
-                            <CheckCircle className="size-5 text-primary mt-1 shrink-0" />
-                            <span><span className="font-semibold">Deepfake Detection:</span> Identifies common artifacts of AI-generated or manipulated video.</span>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <CheckCircle className="size-5 text-primary mt-1 shrink-0" />
-                            <span><span className="font-semibold">Frame-by-Frame Scrutiny:</span> Analyzes video for visual inconsistencies and manipulation.</span>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <CheckCircle className="size-5 text-primary mt-1 shrink-0" />
-                            <span><span className="font-semibold">Audio-Visual Sync:</span> Detects synthetic voices and audio that doesn't match the visuals.</span>
-                        </li>
-                    </ul>
-                    <Button size="lg" onClick={() => setShowTool(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-lg">
-                        Launch Video Integrity <ArrowRight className="ml-2" />
-                    </Button>
-                </div>
-                <div className="hidden md:flex items-center justify-center">
-                    <Video className="w-64 h-64 text-primary" />
-                </div>
-            </div>
+  return (
+    <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold font-heading mb-4">
+            Video Integrity Check
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            In an age of sophisticated digital manipulation, verifying the authenticity of video content is crucial. Our advanced AI-powered tool analyzes video files to detect deepfakes, alterations, and other forms of tampering, ensuring you can trust what you see.
+          </p>
+          <Button size="lg" asChild>
+            <Link href="/video/analysis">Launch Video Integrity</Link>
+          </Button>
         </div>
-    );
+        <Card className="bg-card/50">
+          <CardContent className="p-8">
+            <h3 className="text-2xl font-bold font-heading mb-6">Key Features</h3>
+            <ul className="space-y-4">
+              <li className="flex items-start">
+                <CheckCircle className="w-6 h-6 text-primary mr-4 mt-1 shrink-0" />
+                <div>
+                  <h4 className="font-semibold">Deepfake Detection</h4>
+                  <p className="text-muted-foreground text-sm">
+                    Utilizes cutting-edge neural networks to identify AI-generated or manipulated faces and voices.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="w-6 h-6 text-primary mr-4 mt-1 shrink-0" />
+                <div>
+                  <h4 className="font-semibold">Content Provenance</h4>
+                  <p className="text-muted-foreground text-sm">
+                    Traces the origin and history of the video content to verify its source and authenticity.
+                  </p>
+                </div>
+              </li>
+              <li className="flex items-start">
+                <CheckCircle className="w-6 h-6 text-primary mr-4 mt-1 shrink-0" />
+                <div>
+                  <h4 className="font-semibold">Manipulation Analysis</h4>
+                  <p className="text-muted-foreground text-sm">
+                    Scans for signs of editing, splicing, or other alterations that could distort the original context.
+                  </p>
+                </div>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }
