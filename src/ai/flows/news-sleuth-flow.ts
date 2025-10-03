@@ -25,12 +25,12 @@ const NewsSleuthInputSchema = z.object({
 
 const NewsSleuthOutputSchema = z.object({
   overallScore: z.number().describe('A credibility score from 0-100.'),
-  verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final judgment on the article\'s credibility.'),
+  verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis']).describe('The final judgment on the article\'s credibility.'),
   summary: z.string().describe('A brief summary of the article\'s main points.'),
   biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
-  flaggedContent: z.string().describe('Description of any sensationalism, logical fallacies, or other flagged content.'),
+  flaggedContent: z.array(z.string()).describe('A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims.'),
   reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  sources: z.array(z.string()).describe('A list of URLs used to corroborate facts.'),
+  sources: z.array(z.string()).describe('A list of URLs used to corroborate facts. This MUST be populated from the search results.'),
 });
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
@@ -46,58 +46,38 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `Headline: "${input.articleHeadline}"\n`;
   }
   if (input.articleUrl) {
-    articleInfo += `You MUST fetch and analyze the content from this primary URL: ${input.articleUrl}\n\n`;
+    articleInfo += `Primary Article URL: ${input.articleUrl}\n\n`;
   }
 
-  const prompt = `You are an advanced reasoning engine for detecting fake news. Analyze the provided article information and generate a credibility report in ${input.language}.
+  const prompt = `You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories. Generate a credibility report in ${input.language || 'en'}.
 
-Your JSON output must include these fields:
+Your JSON output must follow this structure exactly:
 - overallScore: A credibility score from 0-100.
-- verdict: Your final judgment ('Likely Real', 'Likely Fake', or 'Uncertain').
+- verdict: Your final judgment (e.g., 'Likely Real', 'Likely Fake', 'Uncertain', 'Satire/Parody', etc.).
 - summary: A brief summary of the article.
 - biases: Analysis of any detected political, commercial, or other biases.
-- flaggedContent: Description of any sensationalism, logical fallacies, or other flagged content.
+- flaggedContent: An array of strings describing any sensationalism, logical fallacies, or other flagged content.
 - reasoning: The reasoning behind your overall verdict and score.
-- sources: An array of URLs you used to verify the information.
+- sources: You MUST list the URLs you used from your search grounding in the 'sources' array. This should not include the original article URL unless it's the only source.
 
 Article Information for Analysis:
 ${articleInfo}`;
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        tools: [{
+          "google_search_retrieval": {}
+        }]
+    });
+    
     const response = result.response;
     const text = response.text();
     
-    // First, try to parse directly
     try {
       const parsed = JSON.parse(text);
       return NewsSleuthOutputSchema.parse(parsed);
     } catch (e) {
-      // If direct parse fails, try to extract from markdown
-      const match = text.match(/```json\n([\s\S]*?)\n```/);
-      if (match && match[1]) {
-        try {
-          const parsed = JSON.parse(match[1]);
-          return NewsSleuthOutputSchema.parse(parsed);
-        } catch (e2) {
-          console.error("Failed to parse extracted markdown JSON:", match[1]);
-        }
-      }
-
-      // If markdown extraction fails, try to find the JSON object manually
-      const startIndex = text.indexOf('{');
-      const endIndex = text.lastIndexOf('}');
-      if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-        const jsonString = text.substring(startIndex, endIndex + 1);
-        try {
-            const parsed = JSON.parse(jsonString);
-            return NewsSleuthOutputSchema.parse(parsed);
-        } catch (e3) {
-            console.error("Failed to parse substring JSON:", jsonString);
-        }
-      }
-      
-      // If all else fails, return the error object
       console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
       return { error: 'PARSING_FAILED', rawResponse: text };
     }
