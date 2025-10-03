@@ -16,13 +16,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
-import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { ScrollArea } from "./ui/scroll-area";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 const formSchema = z.object({
   inputType: z.enum(["text", "url", "headline"]).default("text"),
@@ -78,7 +76,7 @@ const formSchema = z.object({
 export function NewsSleuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NewsSleuthOutput | null>(null);
-  const [rawErrorResponse, setRawErrorResponse] = useState<string | null>(null);
+  const [errorResponse, setErrorResponse] = useState<NewsSleuthError | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -98,7 +96,7 @@ export function NewsSleuth() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setResult(null);
-    setRawErrorResponse(null);
+    setErrorResponse(null);
 
     let analysisInput: { [key: string]: string | undefined } = { language };
     if (values.inputType === 'text') {
@@ -112,21 +110,23 @@ export function NewsSleuth() {
     try {
       const analysisResult = await newsSleuthAnalysis(analysisInput);
       if ('error' in analysisResult) {
-        setRawErrorResponse(analysisResult.rawResponse);
+        setErrorResponse(analysisResult);
         toast({
             variant: "destructive",
-            title: "AI Response Error",
-            description: "The AI returned a response that could not be parsed. See the raw output.",
+            title: "Analysis Failed",
+            description: analysisResult.details || "The AI model failed to generate a response.",
         });
       } else {
         setResult(analysisResult);
       }
     } catch (error) {
       console.error(error);
+      const errorDetails = error instanceof Error ? error.message : "An unexpected error occurred.";
+      setErrorResponse({ error: "UNEXPECTED_ERROR", details: errorDetails });
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: errorDetails,
       });
     } finally {
       setIsLoading(false);
@@ -313,18 +313,18 @@ export function NewsSleuth() {
                   <p className="text-center text-muted-foreground">{t('newsSleuth.analyzingText')}</p>
                 </div>
               )}
-              {!isLoading && !result && !rawErrorResponse && (
+              {!isLoading && !result && !errorResponse && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                   <Icons.barChart className="mx-auto mb-4 h-10 w-10" />
                   <p>{t('newsSleuth.pendingText')}</p>
                 </div>
               )}
-              {rawErrorResponse && (
+              {errorResponse && (
                 <div className="flex-1 flex flex-col min-h-0">
-                  <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Raw AI Response</h3>
+                  <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Analysis Failed</h3>
                   <ScrollArea className="flex-1 pr-4 -mr-4">
                       <pre className="text-sm leading-relaxed text-destructive/80 whitespace-pre-wrap break-words bg-destructive/10 p-4 rounded-md">
-                          {rawErrorResponse}
+                          {errorResponse.details || 'The AI model failed to generate a response.'}
                       </pre>
                   </ScrollArea>
                 </div>

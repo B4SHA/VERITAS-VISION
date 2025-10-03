@@ -14,7 +14,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Icons } from "@/components/icons";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { useTranslation } from "@/hooks/use-translation";
@@ -33,7 +32,7 @@ const formSchema = z.object({
 export function VideoIntegrity() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<VideoIntegrityOutput | null>(null);
-  const [rawErrorResponse, setRawErrorResponse] = useState<string | null>(null);
+  const [errorResponse, setErrorResponse] = useState<VideoIntegrityError | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -55,28 +54,30 @@ export function VideoIntegrity() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setResult(null);
-    setRawErrorResponse(null);
+    setErrorResponse(null);
     
     try {
       const videoDataUri = await fileToDataUri(values.videoFile[0]);
       const analysisResult = await videoIntegrityAnalysis({ videoDataUri, language });
 
       if ('error' in analysisResult) {
-        setRawErrorResponse(analysisResult.rawResponse);
+        setErrorResponse(analysisResult);
         toast({
             variant: "destructive",
-            title: "AI Response Error",
-            description: "The AI returned a response that could not be parsed. See the raw output.",
+            title: "Analysis Failed",
+            description: analysisResult.details || "The AI model failed to generate a response.",
         });
       } else {
         setResult(analysisResult);
       }
     } catch (error) {
       console.error(error);
+      const errorDetails = error instanceof Error ? error.message : "An unexpected error occurred.";
+      setErrorResponse({ error: "UNEXPECTED_ERROR", details: errorDetails });
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: errorDetails,
       });
     } finally {
       setIsLoading(false);
@@ -190,18 +191,18 @@ export function VideoIntegrity() {
                             <p className="text-muted-foreground text-center">{t('videoIntegrity.analyzingText')}</p>
                         </div>
                         )}
-                        {!isLoading && !result && !rawErrorResponse && (
+                        {!isLoading && !result && !errorResponse && (
                         <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                             <Icons.barChart className="h-10 w-10 mx-auto mb-4" />
                             <p>{t('videoIntegrity.pendingText')}</p>
                         </div>
                         )}
-                        {rawErrorResponse && (
+                        {errorResponse && (
                           <div className="flex-1 flex flex-col min-h-0">
-                            <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Raw AI Response</h3>
+                            <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Analysis Failed</h3>
                             <ScrollArea className="flex-1 pr-4 -mr-4">
                                 <pre className="text-sm leading-relaxed text-destructive/80 whitespace-pre-wrap break-words bg-destructive/10 p-4 rounded-md">
-                                    {rawErrorResponse}
+                                    {errorResponse.details || 'The AI model failed to generate a response.'}
                                 </pre>
                             </ScrollArea>
                           </div>
