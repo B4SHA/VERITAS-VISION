@@ -15,10 +15,12 @@ import {
     type ImageVerifierOutput,
     type ImageVerifierError,
 } from '@/ai/schemas';
+import { googleAI } from '@genkit-ai/google-genai';
 
 
 const prompt = ai.definePrompt({
     name: 'imageVerifierPrompt',
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: ImageVerifierInputSchema },
     output: { schema: ImageVerifierOutputSchema },
     prompt: `You are an expert digital image forensics analyst. Analyze the provided image and generate an authenticity report in {{language}}.

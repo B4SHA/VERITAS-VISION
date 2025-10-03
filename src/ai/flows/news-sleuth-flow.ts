@@ -15,9 +15,11 @@ import {
   type NewsSleuthOutput,
   type NewsSleuthError,
 } from '@/ai/schemas';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
     prompt: `You are an advanced reasoning engine for detecting fake news. Generate a credibility report in {{language}}.

@@ -15,9 +15,11 @@ import {
     type AudioAuthenticatorOutput,
     type AudioAuthenticatorError,
 } from '@/ai/schemas';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const prompt = ai.definePrompt({
     name: 'audioAuthenticatorPrompt',
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: AudioAuthenticatorInputSchema },
     output: { schema: AudioAuthenticatorOutputSchema },
     prompt: `You are an expert audio forensics analyst. Analyze the provided audio file and generate an authenticity report in {{language}}.

@@ -15,10 +15,12 @@ import {
     type VideoIntegrityOutput,
     type VideoIntegrityError,
 } from '@/ai/schemas';
+import { googleAI } from '@genkit-ai/google-genai';
 
 
 const prompt = ai.definePrompt({
     name: 'videoIntegrityPrompt',
+    model: googleAI.model('gemini-2.5-flash'),
     input: { schema: VideoIntegrityInputSchema },
     output: { schema: VideoIntegrityOutputSchema },
     prompt: `You are a multimedia forensics expert. Analyze the provided video and generate an integrity report in {{language}}.
