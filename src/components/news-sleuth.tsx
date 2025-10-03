@@ -24,9 +24,8 @@ import { useLanguage } from "@/context/language-context";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const formSchema = z.object({
-  inputType: z.enum(["text", "url", "headline"]).default("text"),
+  inputType: z.enum(["text", "headline"]).default("text"),
   articleText: z.string().optional(),
-  articleUrl: z.string().optional(),
   articleHeadline: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.inputType === 'text') {
@@ -43,17 +42,6 @@ const formSchema = z.object({
         path: ['articleText'],
         message: 'Article text must be less than 15,000 characters.',
       });
-    }
-  }
-  if (data.inputType === 'url') {
-    if (!data.articleUrl) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['articleUrl'], message: 'URL is required.' });
-    } else {
-      try {
-        new URL(data.articleUrl);
-      } catch {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['articleUrl'], message: 'Please enter a valid URL.' });
-      }
     }
   }
   if (data.inputType === 'headline') {
@@ -87,7 +75,6 @@ export function NewsSleuth() {
     defaultValues: {
       inputType: "text",
       articleText: "",
-      articleUrl: "",
       articleHeadline: "",
     },
   });
@@ -102,8 +89,6 @@ export function NewsSleuth() {
     let analysisInput: { [key: string]: any } = { language };
     if (values.inputType === 'text') {
       analysisInput = { ...analysisInput, articleText: values.articleText };
-    } else if (values.inputType === 'url') {
-      analysisInput = { ...analysisInput, articleUrl: values.articleUrl };
     } else if (values.inputType === 'headline') {
       analysisInput = { ...analysisInput, articleHeadline: values.articleHeadline };
     }
@@ -201,22 +186,16 @@ export function NewsSleuth() {
                           <RadioGroup
                             onValueChange={(value) => {
                                 field.onChange(value);
-                                form.clearErrors(['articleText', 'articleUrl', 'articleHeadline']);
+                                form.clearErrors(['articleText', 'articleHeadline']);
                             }}
                             defaultValue={field.value}
-                            className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+                            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
                           >
                             <FormItem className="flex items-center space-x-2 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="text" id="text" />
                               </FormControl>
                               <FormLabel htmlFor="text" className="font-normal cursor-pointer">{t('newsSleuth.inputTextLabel')}</FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="url" id="url" />
-                              </FormControl>
-                              <FormLabel htmlFor="url" className="font-normal cursor-pointer">{t('newsSleuth.inputUrlLabel')}</FormLabel>
                             </FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0">
                               <FormControl>
@@ -242,25 +221,6 @@ export function NewsSleuth() {
                               <Textarea
                                 placeholder={t('newsSleuth.inputTextPlaceholder')}
                                 className="h-[250px] resize-y"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    {inputType === "url" && (
-                      <FormField
-                        control={form.control}
-                        name="articleUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('newsSleuth.inputUrlLabel')}</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder={t('newsSleuth.inputUrlPlaceholder')}
                                 {...field}
                               />
                             </FormControl>
