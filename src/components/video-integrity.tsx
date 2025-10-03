@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { videoIntegrityAnalysis, type VideoIntegrityOutput, type VideoIntegrityError } from "@/ai/flows/video-integrity-flow";
+import { videoIntegrityAnalysis } from "@/ai/flows/video-integrity-flow";
 import { fileToDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "./ui/badge";
+import type { VideoIntegrityOutput, VideoIntegrityError } from "@/ai/schemas";
 
 const formSchema = z.object({
   videoFile: z

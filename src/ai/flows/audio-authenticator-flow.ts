@@ -3,37 +3,18 @@
 /**
  * @fileOverview An audio authentication AI agent.
  *
- * - audioAuthenticatorAnalysis - A function that handles the audio authentication process.
- * - AudioAuthenticatorInput - The input type for the audioAuthenticatorAnalysis function.
- * - AudioAuthenticatorOutput - The return type for the audioAuthenticatorAnalysis function.
+ * This file defines the server-side logic for the Audio Authenticator feature, which
+ * analyzes audio files for authenticity using a Genkit flow.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-
-export const AudioAuthenticatorInputSchema = z.object({
-  audioDataUri: z
-    .string()
-    .describe(
-      "An audio file, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-    language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
-});
-
-export const AudioAuthenticatorOutputSchema = z.object({
-  overallScore: z.number().describe("A score from 0-100 indicating the confidence in the authenticity of the audio."),
-  verdict: z.enum(['Likely Authentic', 'Potential AI/Manipulation', 'Uncertain']).describe("The final judgment on the audio's authenticity."),
-  summary: z.string().describe("A brief summary of the findings."),
-  reasoning: z.string().describe("A detailed report explaining the reasoning behind the verdict."),
-  detectedText: z.string().optional().describe("The transcribed text from the audio, if any. If not, this should be null."),
-});
-
-
-export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSchema>;
-export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSchema>;
-export type AudioAuthenticatorError = { error: string; details?: string };
-
+import {
+    AudioAuthenticatorInputSchema,
+    AudioAuthenticatorOutputSchema,
+    type AudioAuthenticatorInput,
+    type AudioAuthenticatorOutput,
+    type AudioAuthenticatorError,
+} from '@/ai/schemas';
 
 const prompt = ai.definePrompt({
     name: 'audioAuthenticatorPrompt',
@@ -74,7 +55,7 @@ export async function audioAuthenticatorAnalysis(
     console.error("Error in audioAuthenticatorAnalysis flow:", error);
     return {
       error: 'FLOW_EXECUTION_FAILED',
-      details: error.message || 'The AI flow failed to execute.',
+      details: error.message || 'The AI model failed to execute.',
     };
   }
 }

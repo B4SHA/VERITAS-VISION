@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { audioAuthenticatorAnalysis, type AudioAuthenticatorOutput, type AudioAuthenticatorError } from "@/ai/flows/audio-authenticator-flow";
+import { audioAuthenticatorAnalysis } from "@/ai/flows/audio-authenticator-flow";
 import { fileToDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
+import type { AudioAuthenticatorOutput, AudioAuthenticatorError } from "@/ai/schemas";
 
 const formSchema = z.object({
   audioFile: z

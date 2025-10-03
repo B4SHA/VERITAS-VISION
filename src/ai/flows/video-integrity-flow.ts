@@ -3,39 +3,18 @@
 /**
  * @fileOverview A video integrity analysis AI agent.
  *
- * - videoIntegrityAnalysis - A function that handles the video integrity analysis.
- * - VideoIntegrityInput - The input type for the videoIntegrityAnalysis function.
- * - VideoIntegrityOutput - The return type for the videoIntegrityAnalysis function.
+ * This file defines the server-side logic for the Video Integrity feature, which
+ * analyzes videos for authenticity and manipulation using a Genkit flow.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-
-export const VideoIntegrityInputSchema = z.object({
-  videoDataUri: z
-    .string()
-    .describe(
-      "A video file, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-  language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
-});
-
-export const VideoIntegrityOutputSchema = z.object({
-  overallScore: z.number().describe('A confidence score (0-100) in the video\'s authenticity.'),
-  verdict: z.enum(['Likely Authentic', 'Potential Manipulation', 'Uncertain']).describe('The final judgment on the video\'s integrity.'),
-  summary: z.string().describe('A brief summary of the findings.'),
-  deepfake: z.string().describe("Analysis of deepfake elements (e.g., face swapping). State 'Detected' or 'Not Detected' and explain why."),
-  videoManipulation: z.string().describe("Analysis of general video manipulations (CGI, edits). State 'Detected' or 'Not Detected' and explain why."),
-  syntheticVoice: z.string().describe("Analysis of voice cloning or synthetic speech. State 'Detected' or 'Not Detected' and explain why."),
-  reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  detectedText: z.string().optional().describe("Transcribed text from the video's audio track, if any. If none, this should be null."),
-});
-
-
-export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
-export type VideoIntegrityOutput = z.infer<typeof VideoIntegrityOutputSchema>;
-export type VideoIntegrityError = { error: string; details?: string };
+import {
+    VideoIntegrityInputSchema,
+    VideoIntegrityOutputSchema,
+    type VideoIntegrityInput,
+    type VideoIntegrityOutput,
+    type VideoIntegrityError,
+} from '@/ai/schemas';
 
 
 const prompt = ai.definePrompt({
@@ -81,7 +60,7 @@ export async function videoIntegrityAnalysis(
     console.error("Error in videoIntegrityAnalysis flow:", error);
     return {
       error: 'FLOW_EXECUTION_FAILED',
-      details: error.message || 'The AI flow failed to execute.',
+      details: error.message || 'The AI model failed to execute.',
     };
   }
 }

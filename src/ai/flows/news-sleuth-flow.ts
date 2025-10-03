@@ -3,59 +3,33 @@
 /**
  * @fileOverview A news article credibility analysis AI agent.
  *
- * - newsSleuthAnalysis - A function that handles the news credibility analysis.
- * - NewsSleuthInput - The input type for the newsSleuthAnalysis function.
- * - NewsSleuthOutput - The return type for the newsSleuthAnalysis function.
+ * This file defines the server-side logic for the News Sleuth feature, which
+ * analyzes news articles for credibility using a Genkit flow.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-export const NewsSleuthInputSchema = z.object({
-  articleText: z.string().optional().describe('The full text of the news article.'),
-  articleUrl: z.string().optional().describe('The URL of the news article.'),
-  articleHeadline: z.string().optional().describe('The headline of the news article.'),
-  language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
-});
-
-export const NewsSleuthOutputSchema = z.object({
-  overallScore: z.number().describe('A credibility score from 0-100.'),
-  verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis']).describe("The final judgment on the article's credibility."),
-  summary: z.string().describe("A brief summary of the article's main points."),
-  biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
-  flaggedContent: z.array(z.string()).describe('A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims.'),
-  reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  sources: z.array(z.string()).describe('A list of URLs used to corroborate facts. This MUST be populated from the search results.'),
-});
-
-
-export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
-export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
-// Define a type for potential errors, though genkit handles many errors internally
-export type NewsSleuthError = { error: string; details?: string };
-
+import {
+  NewsSleuthInputSchema,
+  NewsSleuthOutputSchema,
+  type NewsSleuthInput,
+  type NewsSleuthOutput,
+  type NewsSleuthError,
+} from '@/ai/schemas';
 
 const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
-    prompt: `You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories. Generate a credibility report in {{language}}.
+    prompt: `You are an advanced reasoning engine for detecting fake news. Generate a credibility report in {{language || 'en'}}.
 
-Article Information for Analysis:
-{{#if articleText}}
-Full Article Text:
----
-{{{articleText}}}
----
-{{/if}}
-{{#if articleHeadline}}
-Headline: "{{{articleHeadline}}}"
-{{/if}}
-{{#if articleUrl}}
-Primary Article URL: {{{articleUrl}}}
-{{/if}}
-
-Your JSON output must follow this structure exactly. You MUST list the URLs you used from your search grounding in the 'sources' array.
+Your JSON output must include these fields:
+- overallScore: A credibility score from 0-100.
+- verdict: Your final judgment ('Likely Real', 'Likely Fake', 'Uncertain').
+- summary: A brief summary of the article's main points.
+- biases: An analysis of any detected biases (e.g., political, commercial).
+- flaggedContent: A list of specific issues found (e.g., sensationalism, logical fallacies).
+- reasoning: The reasoning behind the overall verdict and score.
+- sources: A list of URLs used to corroborate facts. This MUST be populated from the search results.
 `,
 });
 
@@ -83,7 +57,7 @@ export async function newsSleuthAnalysis(
     console.error("Error in newsSleuthAnalysis flow:", error);
     return {
       error: 'FLOW_EXECUTION_FAILED',
-      details: error.message || 'The AI flow failed to execute.',
+      details: error.message || 'The AI model failed to execute.',
     };
   }
 }

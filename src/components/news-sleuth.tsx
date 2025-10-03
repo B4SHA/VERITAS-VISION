@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { newsSleuthAnalysis, type NewsSleuthOutput, type NewsSleuthError } from "@/ai/flows/news-sleuth-flow";
+import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
+import type { NewsSleuthOutput, NewsSleuthError } from "@/ai/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -98,7 +99,7 @@ export function NewsSleuth() {
     setResult(null);
     setErrorResponse(null);
 
-    let analysisInput: { [key: string]: string | undefined } = { language };
+    let analysisInput: { [key: string]: any } = { language };
     if (values.inputType === 'text') {
       analysisInput = { ...analysisInput, articleText: values.articleText };
     } else if (values.inputType === 'url') {
