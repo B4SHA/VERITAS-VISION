@@ -22,6 +22,8 @@ import Link from "next/link";
 import { ScrollArea } from "./ui/scroll-area";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 const formSchema = z.object({
   inputType: z.enum(["text", "url", "headline"]).default("text"),
@@ -37,11 +39,11 @@ const formSchema = z.object({
         message: 'Article text must be at least 100 characters long.',
       });
     }
-    if (data.articleText && data.articleText.length > 10000) {
+    if (data.articleText && data.articleText.length > 15000) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['articleText'],
-        message: 'Article text must be less than 10,000 characters.',
+        message: 'Article text must be less than 15,000 characters.',
       });
     }
   }
@@ -138,28 +140,13 @@ export function NewsSleuth() {
     return "bg-primary";
   };
   
-  const getVerdictBadgeVariant = (verdict: 'Likely Real' | 'Likely Fake' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Real':
-        return 'default';
-      case 'Likely Fake':
-        return 'destructive';
-      case 'Uncertain':
-      default:
-        return 'secondary';
-    }
-  };
-
-  const getVerdictIcon = (verdict: 'Likely Real' | 'Likely Fake' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Real':
-        return <Icons.check className="mr-1.5" />;
-      case 'Likely Fake':
-        return <Icons.alert className="mr-1.5" />;
-      case 'Uncertain':
-      default:
-        return <Icons.help className="mr-1.5" />;
-    }
+  const getAssessmentBadgeVariant = (assessment: string) => {
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes('very low') || lowerAssessment.includes('unreliable') || lowerAssessment.includes('sensationalist')) return 'destructive';
+    if (lowerAssessment.includes('low') || lowerAssessment.includes('weak')) return 'destructive';
+    if (lowerAssessment.includes('medium')) return 'secondary';
+    if (lowerAssessment.includes('high') || lowerAssessment.includes('reliable') || lowerAssessment.includes('neutral')) return 'default';
+    return 'secondary';
   };
 
   return (
@@ -326,87 +313,104 @@ export function NewsSleuth() {
                   </ScrollArea>
                 </div>
               )}
-              {result && result.credibilityReport && (
+              {result && (
                  <div className="flex-1 flex flex-col min-h-0">
                     <div className="px-1 space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-lg">Verdict</h3>
-                            <Badge variant={getVerdictBadgeVariant(result.credibilityReport.verdict)} className="px-3 py-1 text-sm">
-                            {getVerdictIcon(result.credibilityReport.verdict)}
-                            {result.credibilityReport.verdict}
-                            </Badge>
+                            <h3 className="font-semibold text-lg">Overall Credibility Score</h3>
+                            <span className="font-bold text-2xl text-primary">{result.overall_credibility_score.score}/100</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-lg">Credibility Score</h3>
-                            <span className="font-bold text-2xl text-primary">{result.credibilityReport.overallScore}/100</span>
-                        </div>
-                        <Progress value={result.credibilityReport.overallScore} indicatorClassName={getProgressIndicatorClassName(result.credibilityReport.overallScore)} />
+                        <Progress value={result.overall_credibility_score.score} indicatorClassName={getProgressIndicatorClassName(result.overall_credibility_score.score)} />
+                         <p className="text-sm text-muted-foreground">{result.overall_credibility_score.description}</p>
                     </div>
                     <Separator className="my-4" />
                     <div className="flex-1 min-h-0">
                         <ScrollArea className="h-full pr-4">
                             <div className="space-y-6">
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2">Summary</h3>
-                                    <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
-                                        {result.credibilityReport.summary}
-                                    </p>
-                                </div>
-                                <Separator />
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2">Identified Biases</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                    {result.credibilityReport.biases.length > 0 ? (
-                                        result.credibilityReport.biases.map((bias, i) => <Badge key={i} variant="secondary">{bias}</Badge>)
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No significant biases were detected.</p>
-                                    )}
+
+                              <Accordion type="single" collapsible defaultValue="item-1">
+                                <AccordionItem value="item-1">
+                                  <AccordionTrigger>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>Factual Accuracy</span>
+                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.factual_accuracy.assessment)}>{result.credibility_analysis.factual_accuracy.assessment}</Badge>
                                     </div>
-                                </div>
-                                <Separator />
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2">Flagged Content</h3>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.factual_accuracy.details}</p>
+                                  </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-2">
+                                  <AccordionTrigger>
+                                     <div className="flex items-center justify-between w-full">
+                                      <span>Sourcing</span>
+                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.sourcing.assessment)}>{result.credibility_analysis.sourcing.assessment}</Badge>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.sourcing.details}</p>
+                                  </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-3">
+                                  <AccordionTrigger>
+                                     <div className="flex items-center justify-between w-full">
+                                      <span>Bias and Tone</span>
+                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.bias_and_tone.assessment)}>{result.credibility_analysis.bias_and_tone.assessment}</Badge>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.bias_and_tone.details}</p>
+                                  </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-4">
+                                  <AccordionTrigger>Author and Publication Reputation</AccordionTrigger>
+                                  <AccordionContent>
                                     <div className="space-y-2">
-                                    {result.credibilityReport.flaggedContent.length > 0 ? (
-                                        result.credibilityReport.flaggedContent.map((flag, i) => (
-                                        <div key={i} className="flex items-start gap-2 text-sm text-destructive">
-                                            <Icons.alert className="h-4 w-4 mt-0.5 shrink-0" />
-                                            <p>{flag}</p>
-                                        </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No specific content was flagged for low credibility.</p>
-                                    )}
+                                      <p className="text-sm font-semibold">Publication Reputation:</p>
+                                      <p className="text-sm text-muted-foreground">{result.credibility_analysis.author_and_publication_reputation.publication_reputation}</p>
+                                      <p className="text-sm font-semibold mt-2">Author Expertise:</p>
+                                      <p className="text-sm text-muted-foreground">{result.credibility_analysis.author_and_publication_reputation.author_expertise}</p>
                                     </div>
-                                </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-5">
+                                  <AccordionTrigger>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>Logical Fallacies</span>
+                                       <Badge variant={result.credibility_analysis.logical_fallacies.present ? 'destructive' : 'default'}>{result.credibility_analysis.logical_fallacies.present ? "Present" : "Not Present"}</Badge>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.logical_fallacies.details}</p>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              </Accordion>
+
+                                <Separator />
+                                <Alert>
+                                  <Icons.shield className="h-4 w-4" />
+                                  <AlertTitle>Conclusion & Recommendation</AlertTitle>
+                                  <AlertDescription>
+                                    <p className="font-semibold mt-2">Summary:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">{result.conclusion_and_recommendation.summary}</p>
+                                    <p className="font-semibold mt-4">Reader Advice:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">{result.conclusion_and_recommendation.reader_advice}</p>
+                                  </AlertDescription>
+                                </Alert>
+
                                 <Separator />
                                 <div>
-                                    <h3 className="font-semibold text-lg mb-2">Analyst Reasoning</h3>
-                                    <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
-                                        {result.credibilityReport.reasoning}
-                                    </p>
+                                    <h3 className="font-semibold text-lg mb-2">Article Information</h3>
+                                     <div className="text-sm text-muted-foreground space-y-1">
+                                        <p><span className="font-semibold text-foreground">Title:</span> {result.article_info.title}</p>
+                                        {result.article_info.url && <p><span className="font-semibold text-foreground">URL:</span> <Link href={result.article_info.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{result.article_info.url}</Link></p>}
+                                        {result.article_info.publication && <p><span className="font-semibold text-foreground">Publication:</span> {result.article_info.publication}</p>}
+                                        {result.article_info.author && <p><span className="font-semibold text-foreground">Author:</span> {result.article_info.author}</p>}
+                                        {result.article_info.publication_date && <p><span className="font-semibold text-foreground">Date:</span> {result.article_info.publication_date}</p>}
+                                        {result.article_info.category && <p><span className="font-semibold text-foreground">Category:</span> {result.article_info.category}</p>}
+                                     </div>
                                 </div>
-                                <Separator />
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2">Sources Consulted</h3>
-                                    <div className="flex flex-col gap-2">
-                                    {result.credibilityReport.sources.length > 0 ? (
-                                        result.credibilityReport.sources.map((source, i) => (
-                                        <Link
-                                            key={i}
-                                            href={source}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm text-primary hover:underline break-words"
-                                        >
-                                            {source}
-                                        </Link>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No external sources were cited for this analysis.</p>
-                                    )}
-                                    </div>
-                                </div>
+
                             </div>
                         </ScrollArea>
                     </div>
@@ -419,5 +423,3 @@ export function NewsSleuth() {
     </div>
   );
 }
-
-    
