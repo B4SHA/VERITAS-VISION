@@ -7,7 +7,7 @@
  * analyzes news articles for credibility by calling the Gemini API directly.
  */
 
-import { GoogleGenerativeAI, type GenerateContentRequest } from '@google/generative-ai';
+import { GoogleGenerativeAI, type GenerateContentRequest, type Part } from '@google/generative-ai';
 import {
   type NewsSleuthInput,
   type NewsSleuthOutput,
