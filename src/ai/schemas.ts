@@ -11,8 +11,8 @@ export const NewsSleuthInputSchema = z.object({
 
 export const NewsSleuthOutputSchema = z.object({
   overallScore: z.number().describe('A credibility score from 0-100.'),
-  verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis']).describe("The final judgment on the article's credibility."),
-  summary: z.string().describe("A brief summary of the article's main points."),
+  verdict: z.string().describe("The final judgment on the article's credibility (e.g., 'Likely Real', 'Likely Fake', 'Uncertain')."),
+  summary: z.string().describe("A brief summary of the article's main points and the analysis findings."),
   biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
   flaggedContent: z.array(z.string()).describe('A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims.'),
   reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
@@ -39,7 +39,7 @@ export const ImageVerifierOutputSchema = z.object({
     overallScore: z.number().describe("A score from 0-100 indicating the confidence in the verdict."),
     summary: z.string().describe("A brief summary of the findings."),
     reasoning: z.string().describe("A detailed forensic report explaining the analysis, including details about artifacts, inconsistencies, etc."),
-    detectedText: z.string().optional().describe("Text detected within the image. If none, this should be null."),
+    detectedText: z.string().optional().nullable().describe("Text detected within the image. If none, this should be null."),
 });
 
 export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
@@ -62,7 +62,7 @@ export const AudioAuthenticatorOutputSchema = z.object({
   verdict: z.enum(['Likely Authentic', 'Potential AI/Manipulation', 'Uncertain']).describe("The final judgment on the audio's authenticity."),
   summary: z.string().describe("A brief summary of the findings."),
   reasoning: z.string().describe("A detailed report explaining the reasoning behind the verdict."),
-  detectedText: z.string().optional().describe("The transcribed text from the audio, if any. If not, this should be null."),
+  detectedText: z.string().optional().nullable().describe("The transcribed text from the audio, if any. If not, this should be null."),
 });
 
 export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSchema>;
@@ -88,7 +88,7 @@ export const VideoIntegrityOutputSchema = z.object({
   videoManipulation: z.string().describe("Analysis of general video manipulations (CGI, edits). State 'Detected' or 'Not Detected' and explain why."),
   syntheticVoice: z.string().describe("Analysis of voice cloning or synthetic speech. State 'Detected' or 'Not Detected' and explain why."),
   reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  detectedText: z.string().optional().describe("Transcribed text from the video's audio track, if any. If none, this should be null."),
+  detectedText: z.string().optional().nullable().describe("Transcribed text from the video's audio track, if any. If none, this should be null."),
 });
 
 export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;

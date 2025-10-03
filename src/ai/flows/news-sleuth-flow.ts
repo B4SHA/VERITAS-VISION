@@ -20,7 +20,12 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash',
+generationConfig: {
+    responseMimeType: 'application/json',
+},
+tools: [{googleSearch: {}}]
+});
 
 
 export async function newsSleuthAnalysis(
@@ -35,10 +40,10 @@ export async function newsSleuthAnalysis(
     You are a world-class investigative journalist and fact-checker AI.
     Your task is to analyze the provided article information for credibility and generate a report.
     
-    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
+    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. For text or headline inputs, use search to find context and corroborating sources.
     2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article.
     3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search. If you are not given a URL and cannot perform a search, this array must be empty.
+    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search. If you cannot perform a search, this array must be empty.
     5.  You MUST output your final report in ${input.language}.
     6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
@@ -49,26 +54,27 @@ export async function newsSleuthAnalysis(
   `;
 
   try {
-
     const request: GenerateContentRequest = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: NewsSleuthOutputSchema.jsonSchema,
-        },
     };
 
-    if (input.articleUrl) {
-        request.tools = [{ googleSearch: {} }];
-    }
-
     const result = await model.generateContent(request);
-
-    const response = result.response;
-    let output: NewsSleuthOutput;
     
-    // The response is already a parsed JSON object because of responseMimeType
-    output = response.text() as unknown as NewsSleuthOutput;
+    const response = result.response;
+    const responseText = response.text();
+
+    let output: NewsSleuthOutput;
+
+    try {
+        // The response is already a parsed JSON object because of responseMimeType
+        output = JSON.parse(responseText) as NewsSleuthOutput;
+    } catch(e) {
+        console.error("Failed to parse JSON from model response:", responseText);
+        return {
+            error: 'INVALID_JSON',
+            details: 'The AI model returned an invalid JSON format. Please try again.',
+        };
+    }
     
     return output;
 

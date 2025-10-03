@@ -155,24 +155,30 @@ export function NewsSleuth() {
     return 'secondary';
   };
 
-  const AnalysisItem = ({ title, content }: { title: string, content: string | string[] }) => (
-    <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
-      <AccordionTrigger>
-        <div className="flex items-center justify-between w-full">
-          <span>{title}</span>
-        </div>
-      </AccordionTrigger>
-      <AccordionContent>
-        {Array.isArray(content) ? (
-          <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-            {content.map((point, i) => <li key={i}>{point}</li>)}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">{content}</p>
-        )}
-      </AccordionContent>
-    </AccordionItem>
-  );
+  const AnalysisItem = ({ title, content }: { title: string, content: string | string[] | undefined }) => {
+    if (!content || (Array.isArray(content) && content.length === 0)) {
+        return null;
+    }
+    
+    return (
+        <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
+        <AccordionTrigger>
+            <div className="flex items-center justify-between w-full">
+            <span>{title}</span>
+            </div>
+        </AccordionTrigger>
+        <AccordionContent>
+            {Array.isArray(content) ? (
+            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                {content.map((point, i) => <li key={i}>{point}</li>)}
+            </ul>
+            ) : (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{content}</p>
+            )}
+        </AccordionContent>
+        </AccordionItem>
+    );
+  };
 
   const report = result;
 
@@ -335,7 +341,7 @@ export function NewsSleuth() {
                   <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Analysis Failed</h3>
                   <ScrollArea className="flex-1 pr-4 -mr-4">
                       <pre className="text-sm leading-relaxed text-destructive/80 whitespace-pre-wrap break-words bg-destructive/10 p-4 rounded-md">
-                          {errorResponse.details || 'The AI model failed to generate a response.'}
+                          {errorResponse.details || 'An unexpected error occurred.'}
                       </pre>
                   </ScrollArea>
                 </div>
@@ -348,7 +354,7 @@ export function NewsSleuth() {
                           <CardHeader>
                               <div className="flex justify-between items-center">
                                 <CardTitle className="text-lg">Overall Score</CardTitle>
-                                <Badge variant={getVerdictBadgeVariant(report.verdict)}>{report.verdict}</Badge>
+                                {report.verdict && <Badge variant={getVerdictBadgeVariant(report.verdict)}>{report.verdict}</Badge>}
                               </div>
                           </CardHeader>
                           <CardContent>
@@ -357,11 +363,11 @@ export function NewsSleuth() {
                                 <span className="text-muted-foreground text-lg">/ 100</span>
                               </div>
                               <Progress value={report.overallScore} indicatorClassName={getProgressIndicatorClassName(report.overallScore)} className="my-3"/>
-                              <p className="text-sm text-muted-foreground">{report.summary}</p>
+                              {report.summary && <p className="text-sm text-muted-foreground">{report.summary}</p>}
                           </CardContent>
                       </Card>
 
-                      <Accordion type="multiple" defaultValue={['reasoning', 'flagged-content']} className="w-full">
+                      <Accordion type="multiple" defaultValue={['reasoning', 'flagged-content', 'sources']} className="w-full">
                         <AnalysisItem title="Reasoning" content={report.reasoning} />
                         <AnalysisItem title="Biases" content={report.biases} />
                         <AnalysisItem title="Flagged Content" content={report.flaggedContent} />
