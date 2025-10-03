@@ -46,15 +46,8 @@ const fetchUrlTool = {
     ]
 };
 
-const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
-
 const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
-    },
     safetySettings: [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -101,6 +94,8 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
         articleInfo += `**PRIMARY URL TO FETCH**: ${input.articleUrl}\n\n`;
     }
 
+    const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+
     const prompt = `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
 
 **Your Task:**
@@ -110,7 +105,11 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
 2.  **Analyze the Content:** Assess the article's structure, language, and claims.
 3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search.
 4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
-5.  **Generate Credibility Report:** Fill out the JSON structure completely, ensuring all fields are present.
+5.  **Generate Credibility Report:** You must respond with a valid JSON object that conforms to the following JSON Schema. Do not output any text or markdown formatting before or after the JSON object.
+    
+    \`\`\`json
+    ${JSON.stringify(cleanJsonSchema(jsonSchema))}
+    \`\`\`
 
 The output language for the report must be in the language specified by the user: **${input.language}**.
 
@@ -144,5 +143,6 @@ ${articleInfo}
     }
     
     const responseText = response.text();
-    return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
+    const jsonText = responseText.replace(/```json\n?/, '').replace(/```$/, '');
+    return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
 }
