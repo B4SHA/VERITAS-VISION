@@ -26,12 +26,16 @@ function getTranslatedValue(language: string, key: string) {
         currentObject = currentObject[part];
     }
 
-    if (currentObject[language] === undefined) {
-        // Fallback to English if the specific language is not available
-        return currentObject['en'] || key;
+    if (typeof currentObject === 'object' && currentObject !== null && currentObject[language] !== undefined) {
+        // This handles keys that point to an object with language variants, like "home.heroTitle"
+        return currentObject[language];
+    } else if (typeof currentObject === 'string') {
+        // This handles cases where the key itself might already be a translated string (less common in this structure)
+        return currentObject;
     }
 
-    return currentObject[language];
+    // Fallback to English if the specific language is not available or if the structure is unexpected
+    return (currentObject && currentObject['en']) || key;
 }
 
 
