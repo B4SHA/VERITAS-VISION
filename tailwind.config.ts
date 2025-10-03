@@ -19,6 +19,7 @@ export default {
       fontFamily: {
         sans: ["var(--font-sans)"],
         heading: ["var(--font-heading)"],
+        body: ["var(--font-inter)"],
       },
       colors: {
         background: 'hsl(var(--background))',
