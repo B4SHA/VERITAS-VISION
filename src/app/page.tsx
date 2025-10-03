@@ -20,7 +20,6 @@ const sectionVariants = {
 };
 
 export default function Home() {
-  // useTranslation now provides the correctly structured data
   const { t, getFeatures } = useTranslation();
 
   const features = getFeatures();
