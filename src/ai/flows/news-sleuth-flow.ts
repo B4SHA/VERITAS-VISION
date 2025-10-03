@@ -19,7 +19,7 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', tools: [{googleSearch: {}}] });
 
 
 const NewsSleuthOutputJsonSchema = {
@@ -83,12 +83,11 @@ export async function newsSleuthAnalysis(
   try {
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      tools: [{ googleSearch: {} }],
     });
 
     const response = result.response;
     let responseText = response.text();
-
+    
     if (!responseText) {
         throw new Error("The AI model returned an empty response.");
     }
@@ -107,11 +106,14 @@ export async function newsSleuthAnalysis(
         throw new Error("The AI model returned an invalid JSON format. Please try again.");
     }
 
-    // Extract sources from grounding metadata
-    const metadata = response.candidates?.[0]?.groundingMetadata;
-    const searchResults = metadata?.groundingAttributions || [];
-    const sources = searchResults.map(attribution => attribution.web?.uri || '').filter(uri => !!uri);
-
+    const toolCalls = response.functionCalls();
+    let sources: string[] = [];
+    if (toolCalls) {
+      sources = toolCalls.flatMap(toolCall => 
+          toolCall.args.results?.map((res: any) => res.uri) || []
+      ).filter((uri: string | undefined): uri is string => !!uri);
+    }
+    
     return { ...output, sources: sources };
   } catch (error: any) {
     console.error('API Error:', error);
