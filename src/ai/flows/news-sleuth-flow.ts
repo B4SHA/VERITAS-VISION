@@ -51,7 +51,7 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
 
 **Instructions:**
 1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
-2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
+2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language (sensationalism, logical fallacies).
 3.  **GENERATE JSON REPORT**: The output language must be: **${input.language}**.
 
 Article Information for Analysis:
@@ -68,7 +68,9 @@ Your final output MUST be only a single JSON object that strictly adheres to the
     let text = response.text();
 
     try {
-        // Find the start and end of the JSON object
+        if (text.startsWith("```json")) {
+          text = text.substring(7, text.length - 3);
+        }
         const startIndex = text.indexOf('{');
         const endIndex = text.lastIndexOf('}');
         if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {

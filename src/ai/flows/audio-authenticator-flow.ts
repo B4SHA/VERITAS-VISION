@@ -62,7 +62,9 @@ Your final output MUST be only a single JSON object that strictly adheres to the
     let text = response.text();
 
     try {
-        // Find the start and end of the JSON object
+        if (text.startsWith("```json")) {
+          text = text.substring(7, text.length - 3);
+        }
         const startIndex = text.indexOf('{');
         const endIndex = text.lastIndexOf('}');
         if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {

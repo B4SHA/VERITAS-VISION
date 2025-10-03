@@ -25,7 +25,7 @@ const VideoIntegrityInputSchema = z.object({
 
 const VideoIntegrityOutputSchema = z.object({
   confidenceScore: z.number().describe("Overall confidence score (0-100) in the analysis provided."),
-  verdict: z.string().describe("A concise verdict on the video's authenticity (e.g., 'Likely Authentic', 'Contains Deepfake Elements', 'Manipulated')."),
+  verdict: z.string().describe("A concise verdict on the video's authenticity (e.g., 'Likely Authentic', 'Contains Deepfake Elements', 'Manipulated', 'Satirical/Parody')."),
   report: z.string().describe("A comprehensive report detailing all findings from the visual, audio, and contextual analysis."),
   detectedText: z.string().optional().describe("Transcribed text from the video's audio track."),
 });
@@ -40,11 +40,11 @@ export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promis
   const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
 You will perform a multi-modal analysis:
-1.  **Visual Analysis**: Examine frames for artifacts related to deepfakes, CGI, edits, and other manipulations.
-2.  **Audio Analysis**: Analyze the audio for voice cloning, synthesis, or manipulation.
+1.  **Visual Analysis**: Examine frames for artifacts related to deepfakes (e.g., face swapping), CGI, edits, temporal inconsistencies, and other manipulations.
+2.  **Audio Analysis**: Analyze the audio for voice cloning, synthetic speech, or manipulation.
 3.  **Speech-to-Text**: Transcribe any spoken words and include them in the 'detectedText' field.
-4.  **Contextual Web Search**: Use Google Search to find context, fact-checks, or the origin of the video.
-5.  **Overall Assessment**: Synthesize all findings into a holistic judgment. Provide a final 'verdict', a 'confidenceScore' (0-100), and a detailed 'report' that explains your reasoning based on all analysis steps.
+4.  **Contextual Web Search**: Use Google Search to find context, fact-checks, or the origin of the video. Check if the content is satirical or a parody.
+5.  **Overall Assessment**: Synthesize all findings into a holistic judgment. Provide a final 'verdict' (e.g., 'Likely Authentic', 'Contains Deepfake Elements', 'Manipulated', 'Satirical/Parody'), a 'confidenceScore' (0-100), and a detailed 'report' that explains your reasoning based on all analysis steps.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
@@ -61,7 +61,9 @@ Your final output MUST be only a single JSON object that strictly adheres to the
     let text = response.text();
 
     try {
-        // Find the start and end of the JSON object
+        if (text.startsWith("```json")) {
+          text = text.substring(7, text.length - 3);
+        }
         const startIndex = text.indexOf('{');
         const endIndex = text.lastIndexOf('}');
         if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
