@@ -28,25 +28,25 @@ export default function Home() {
     {
         Icon: Icons.news,
         title: t('navigation.newsSleuth'),
-        description: t('home.features.0.description').substring(0,45) + '...',
+        description: features[0]?.description.substring(0,45) + '...' || '',
         href: '/news-sleuth',
     },
     {
         Icon: Icons.video,
         title: t('navigation.videoIntegrity'),
-        description: t('home.features.1.description').substring(0,45) + '...',
+        description: features[1]?.description.substring(0,45) + '...' || '',
         href: '/video-integrity',
     },
     {
         Icon: Icons.audio,
         title: t('navigation.audioAuthenticator'),
-        description: t('home.features.2.description').substring(0,45) + '...',
+        description: features[2]?.description.substring(0,45) + '...' || '',
         href: '/audio-authenticator',
     },
     {
         Icon: Icons.image,
         title: t('navigation.imageVerifier'),
-        description: t('home.features.3.description').substring(0,45) + '...',
+        description: features[3]?.description.substring(0,45) + '...' || '',
         href: '/image-verifier',
     },
 ]

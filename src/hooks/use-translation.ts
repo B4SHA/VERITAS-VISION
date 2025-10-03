@@ -3,11 +3,10 @@ import { useLanguage } from '@/context/language-context';
 import { translations } from '@/data/translations';
 
 export function useTranslation() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const getFeatures = () => {
-    const features = t('home.features') as unknown as Array<{title: string, description: string, featureList: string[]}>;
-    return features;
+    return translations['home'][language].features as Array<{title: string, description: string, featureList: string[]}>;
   }
 
   const navigationLinks = [
