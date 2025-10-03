@@ -68,8 +68,12 @@ Your JSON output must include these fields:
           // If direct parse fails, try to extract from markdown
           const match = text.match(/```json\n([\s\S]*?)\n```/);
           if (match && match[1]) {
-            const parsed = JSON.parse(match[1]);
-            return ImageVerifierOutputSchema.parse(parsed);
+            try {
+              const parsed = JSON.parse(match[1]);
+              return ImageVerifierOutputSchema.parse(parsed);
+            } catch(e2) {
+              console.error("Failed to parse extracted markdown JSON:", match[1]);
+            }
           }
 
           // If markdown extraction fails, try to find the JSON object manually
@@ -77,8 +81,12 @@ Your JSON output must include these fields:
           const endIndex = text.lastIndexOf('}');
           if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
             const jsonString = text.substring(startIndex, endIndex + 1);
-            const parsed = JSON.parse(jsonString);
-            return ImageVerifierOutputSchema.parse(parsed);
+            try {
+              const parsed = JSON.parse(jsonString);
+              return ImageVerifierOutputSchema.parse(parsed);
+            } catch (e3) {
+              console.error("Failed to parse substring JSON:", jsonString);
+            }
           }
           
           // If all else fails, return the error object

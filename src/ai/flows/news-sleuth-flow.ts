@@ -49,7 +49,7 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `You MUST fetch and analyze the content from this primary URL: ${input.articleUrl}\n\n`;
   }
 
-  const prompt = `You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories. Analyze the provided article information and generate a credibility report in ${input.language}.
+  const prompt = `You are an advanced reasoning engine for detecting fake news. Analyze the provided article information and generate a credibility report in ${input.language}.
 
 Your JSON output must include these fields:
 - overallScore: A credibility score from 0-100.
@@ -58,7 +58,7 @@ Your JSON output must include these fields:
 - biases: Analysis of any detected political, commercial, or other biases.
 - flaggedContent: Description of any sensationalism, logical fallacies, or other flagged content.
 - reasoning: The reasoning behind your overall verdict and score.
-- sources: An array of URLs you used from your search grounding to verify the information.
+- sources: An array of URLs you used to verify the information.
 
 Article Information for Analysis:
 ${articleInfo}`;
@@ -76,8 +76,12 @@ ${articleInfo}`;
       // If direct parse fails, try to extract from markdown
       const match = text.match(/```json\n([\s\S]*?)\n```/);
       if (match && match[1]) {
-        const parsed = JSON.parse(match[1]);
-        return NewsSleuthOutputSchema.parse(parsed);
+        try {
+          const parsed = JSON.parse(match[1]);
+          return NewsSleuthOutputSchema.parse(parsed);
+        } catch (e2) {
+          console.error("Failed to parse extracted markdown JSON:", match[1]);
+        }
       }
 
       // If markdown extraction fails, try to find the JSON object manually
@@ -85,8 +89,12 @@ ${articleInfo}`;
       const endIndex = text.lastIndexOf('}');
       if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
         const jsonString = text.substring(startIndex, endIndex + 1);
-        const parsed = JSON.parse(jsonString);
-        return NewsSleuthOutputSchema.parse(parsed);
+        try {
+            const parsed = JSON.parse(jsonString);
+            return NewsSleuthOutputSchema.parse(parsed);
+        } catch (e3) {
+            console.error("Failed to parse substring JSON:", jsonString);
+        }
       }
       
       // If all else fails, return the error object
