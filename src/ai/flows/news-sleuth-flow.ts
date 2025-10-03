@@ -87,20 +87,25 @@ export async function newsSleuthAnalysis(
     });
 
     const response = result.response;
-    const responseText = response.text();
+    let responseText = response.text();
 
     if (!responseText) {
         throw new Error("The AI model returned an empty response.");
     }
-
+    
     let output: NewsSleuthOutput;
     try {
+        // Find the start and end of the JSON object
+        const startIndex = responseText.indexOf('{');
+        const endIndex = responseText.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            responseText = responseText.substring(startIndex, endIndex + 1);
+        }
         output = JSON.parse(responseText);
     } catch(e) {
         console.error("Failed to parse JSON from model response:", responseText);
         throw new Error("The AI model returned an invalid JSON format. Please try again.");
     }
-
 
     // Extract sources from grounding metadata
     const metadata = response.candidates?.[0]?.groundingMetadata;
