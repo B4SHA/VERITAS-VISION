@@ -41,7 +41,7 @@ const NewsSleuthOutputSchema = z.object({
     biases: z.array(z.string()).describe('A list of identified biases (e.g., "Confirmation Bias", "Sensationalism").'),
     flaggedContent: z.array(z.string()).describe('Specific phrases or claims that are flagged as potentially misleading or false.'),
     reasoning: z.string().describe('A detailed explanation of how the score and verdict were determined.'),
-    sources: z.array(z.string()).describe('A list of URLs for sources consulted during the analysis.'),
+    sources: z-array(z.string()).describe('A list of URLs for sources consulted during the analysis.'),
   }),
 });
 
@@ -87,7 +87,6 @@ You will receive one of the following: the full text of an article, a URL to an 
     *   **Sources:** List the URLs of the primary sources you used for fact-checking.
 
 The output language for the report must be in the language specified by the user: {{{language}}}.
-The current date is October 3rd, 2025.
 
 **Article Information for Analysis:**
 {{#if articleText}}
