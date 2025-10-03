@@ -41,7 +41,7 @@ const prompt = ai.definePrompt({
     output: { schema: ImageVerifierOutputSchema },
     tools: [
       {
-        tool: 'googleSearch',
+        google_search: {},
       }
     ],
     prompt: `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context, grounded in real-time web search results.

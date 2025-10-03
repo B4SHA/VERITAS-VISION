@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
     output: { schema: AudioAuthenticatorOutputSchema },
     tools: [
       {
-        tool: 'googleSearch',
+        google_search: {},
       }
     ],
     prompt: `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery, grounded in real-time web search results.
