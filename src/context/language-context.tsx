@@ -15,31 +15,27 @@ export const languages: { value: Language; label: string }[] = [
   { value: 'ta', label: 'Tamil' },
 ];
 
-function getTranslatedValue(language: string, key: string) {
+// This is the corrected function to recursively find the translation.
+function getTranslatedValue(lang: Language, key: string): any {
     const keyParts = key.split('.');
     let currentObject: any = translations;
 
     for (const part of keyParts) {
-        if (currentObject[part] === undefined) {
-            // Fallback for top-level keys
-            if (translations[key] && translations[key][language]) {
-                return translations[key][language];
-            }
-            return key; // Key not found
+        if (currentObject && typeof currentObject === 'object' && part in currentObject) {
+            currentObject = currentObject[part];
+        } else {
+            // Key path is invalid
+            return key;
         }
-        currentObject = currentObject[part];
     }
     
-    if (typeof currentObject === 'object' && currentObject !== null && currentObject[language] !== undefined) {
-        // This handles keys that point to an object with language variants, like "home.heroTitle"
-        return currentObject[language];
-    } else if (typeof currentObject === 'string') {
-        // This handles cases where the key itself might already be a translated string (less common in this structure)
-        return currentObject;
+    // After iterating through the key path, the final object should have the language key.
+    if (currentObject && typeof currentObject === 'object' && lang in currentObject) {
+        return currentObject[lang];
     }
-
-    // Fallback to English if the specific language is not available or if the structure is unexpected
-    return (currentObject && currentObject['en']) || key;
+    
+    // Fallback if the final lookup fails
+    return key;
 }
 
 
@@ -54,6 +50,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
 
+  // useMemo will re-create the `t` function only when the language changes.
   const t = useMemo(() => (key: string): any => {
     return getTranslatedValue(language, key);
   }, [language]);
