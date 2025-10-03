@@ -20,7 +20,7 @@ const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
-    prompt: `You are an advanced reasoning engine for detecting fake news. Generate a credibility report in {{language || 'en'}}.
+    prompt: `You are an advanced reasoning engine for detecting fake news. Generate a credibility report in {{language}}.
 
 Your JSON output must include these fields:
 - overallScore: A credibility score from 0-100.
