@@ -42,7 +42,7 @@ export const ImageVerifierOutputSchema = z.object({
     detectedText: z.string().optional().describe("Text detected within the image. If none, this should be null."),
 });
 
-export type ImageVerifierInput = z-infer<typeof ImageVerifierInputSchema>;
+export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 export type ImageVerifierError = { error: string; details?: string };
 
