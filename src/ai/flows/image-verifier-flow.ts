@@ -2,6 +2,7 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
+import { googleSearch } from '@genkit-ai/google-search';
 import { z } from 'zod';
 
 const ImageVerifierInputSchema = z.object({
@@ -39,11 +40,7 @@ const prompt = ai.definePrompt({
     name: 'imageVerifierPrompt',
     input: { schema: ImageVerifierInputSchema },
     output: { schema: ImageVerifierOutputSchema },
-    tools: [
-      {
-        google_search: {},
-      }
-    ],
+    tools: [googleSearch],
     prompt: `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context, grounded in real-time web search results.
 
 You will perform the following analysis:
@@ -71,4 +68,3 @@ const imageVerifierFlow = ai.defineFlow(
     return output!;
   }
 );
-

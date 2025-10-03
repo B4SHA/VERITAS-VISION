@@ -2,6 +2,7 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
+import { googleSearch } from '@genkit-ai/google-search';
 import { z } from 'zod';
 
 const AudioAuthenticatorInputSchema = z.object({
@@ -34,11 +35,7 @@ const prompt = ai.definePrompt({
     name: 'audioAuthenticatorPrompt',
     input: { schema: AudioAuthenticatorInputSchema },
     output: { schema: AudioAuthenticatorOutputSchema },
-    tools: [
-      {
-        google_search: {},
-      }
-    ],
+    tools: [googleSearch],
     prompt: `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery, grounded in real-time web search results.
 
 You will perform the following analysis:
@@ -67,4 +64,3 @@ const audioAuthenticatorFlow = ai.defineFlow(
     return output!;
   }
 );
-
