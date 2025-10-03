@@ -43,12 +43,8 @@ const prompt = ai.definePrompt({
     name: 'videoIntegrityPrompt',
     input: { schema: VideoIntegrityInputSchema },
     output: { schema: VideoIntegrityOutputSchema },
-    config: {
-      retrieval: {
-        tool: 'googleSearch',
-      },
-    },
-    prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
+    tools: ['googleSearch'],
+    prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You can use the 'googleSearch' tool to find real-time information to ground your analysis.
 
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
@@ -61,7 +57,7 @@ You will perform a multi-modal analysis:
     *   Transcribe any spoken words in the video.
     *   Analyze the transcribed text for misinformation, propaganda, or out-of-context statements.
 4.  **Contextual Web Search**:
-    *   Based on the visual content, transcribed text, and any identifiable people or locations, use your access to Google Search.
+    *   Based on the visual content, transcribed text, and any identifiable people or locations, use the 'googleSearch' tool.
     *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
 5.  **Overall Assessment**:
     *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
