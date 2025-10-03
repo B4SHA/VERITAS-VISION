@@ -33,9 +33,10 @@ const ImageVerifierOutputSchema = z.object({
 
 export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
+export type ImageVerifierError = { error: string; rawResponse: string };
 
 
-export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
+export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput | ImageVerifierError> {
   const imagePart = dataUriToGenerativePart(input.imageDataUri);
 
   const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context.
@@ -86,6 +87,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
       }
   } catch (e) {
       console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-      throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
+      return { error: 'PARSING_FAILED', rawResponse: text };
   }
 }

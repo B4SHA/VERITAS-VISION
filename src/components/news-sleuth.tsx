@@ -5,10 +5,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { newsSleuthAnalysis, type NewsSleuthOutput } from "@/ai/flows/news-sleuth-flow";
+import { newsSleuthAnalysis, type NewsSleuthOutput, type NewsSleuthError } from "@/ai/flows/news-sleuth-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/componentsui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,7 @@ const formSchema = z.object({
 export function NewsSleuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NewsSleuthOutput | null>(null);
+  const [rawErrorResponse, setRawErrorResponse] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -96,6 +97,7 @@ export function NewsSleuth() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setResult(null);
+    setRawErrorResponse(null);
 
     let analysisInput: { [key: string]: string | undefined } = { language };
     if (values.inputType === 'text') {
@@ -108,7 +110,16 @@ export function NewsSleuth() {
     
     try {
       const analysisResult = await newsSleuthAnalysis(analysisInput);
-      setResult(analysisResult);
+      if ('error' in analysisResult) {
+        setRawErrorResponse(analysisResult.rawResponse);
+        toast({
+            variant: "destructive",
+            title: "AI Response Error",
+            description: "The AI returned a response that could not be parsed. See the raw output.",
+        });
+      } else {
+        setResult(analysisResult);
+      }
     } catch (error) {
       console.error(error);
       toast({
@@ -299,10 +310,20 @@ export function NewsSleuth() {
                   <p className="text-center text-muted-foreground">{t('newsSleuth.analyzingText')}</p>
                 </div>
               )}
-              {!isLoading && !result && (
+              {!isLoading && !result && !rawErrorResponse && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                   <Icons.barChart className="mx-auto mb-4 h-10 w-10" />
                   <p>{t('newsSleuth.pendingText')}</p>
+                </div>
+              )}
+              {rawErrorResponse && (
+                <div className="flex-1 flex flex-col min-h-0">
+                  <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Raw AI Response</h3>
+                  <ScrollArea className="flex-1 pr-4 -mr-4">
+                      <pre className="text-sm leading-relaxed text-destructive/80 whitespace-pre-wrap break-words bg-destructive/10 p-4 rounded-md">
+                          {rawErrorResponse}
+                      </pre>
+                  </ScrollArea>
                 </div>
               )}
               {result && result.credibilityReport && (

@@ -34,8 +34,9 @@ const NewsSleuthOutputSchema = z.object({
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
+export type NewsSleuthError = { error: string; rawResponse: string };
 
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
   let articleInfo = '';
   if (input.articleText) {
     articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
@@ -92,6 +93,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
         }
     } catch (e) {
         console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-        throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
+        return { error: 'PARSING_FAILED', rawResponse: text };
     }
 }

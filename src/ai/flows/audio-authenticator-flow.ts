@@ -32,9 +32,10 @@ const AudioAuthenticatorInputSchema = z.object({
 
 export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSchema>;
 export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSchema>;
+export type AudioAuthenticatorError = { error: string; rawResponse: string };
 
 
-export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
+export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput | AudioAuthenticatorError> {
   const audioPart = dataUriToGenerativePart(input.audioDataUri);
 
   const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery.
@@ -85,6 +86,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
       }
     } catch (e) {
         console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-        throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
+        return { error: 'PARSING_FAILED', rawResponse: text };
     }
 }

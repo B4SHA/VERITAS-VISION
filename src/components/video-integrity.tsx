@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { videoIntegrityAnalysis, type VideoIntegrityOutput } from "@/ai/flows/video-integrity-flow";
+import { videoIntegrityAnalysis, type VideoIntegrityOutput, type VideoIntegrityError } from "@/ai/flows/video-integrity-flow";
 import { fileToDataUri } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ const formSchema = z.object({
 export function VideoIntegrity() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<VideoIntegrityOutput | null>(null);
+  const [rawErrorResponse, setRawErrorResponse] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -54,11 +55,22 @@ export function VideoIntegrity() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setResult(null);
+    setRawErrorResponse(null);
     
     try {
       const videoDataUri = await fileToDataUri(values.videoFile[0]);
       const analysisResult = await videoIntegrityAnalysis({ videoDataUri, language });
-      setResult(analysisResult);
+
+      if ('error' in analysisResult) {
+        setRawErrorResponse(analysisResult.rawResponse);
+        toast({
+            variant: "destructive",
+            title: "AI Response Error",
+            description: "The AI returned a response that could not be parsed. See the raw output.",
+        });
+      } else {
+        setResult(analysisResult);
+      }
     } catch (error) {
       console.error(error);
       toast({
@@ -154,11 +166,21 @@ export function VideoIntegrity() {
                             <p className="text-muted-foreground text-center">{t('videoIntegrity.analyzingText')}</p>
                         </div>
                         )}
-                        {!isLoading && !result && (
+                        {!isLoading && !result && !rawErrorResponse && (
                         <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                             <Icons.barChart className="h-10 w-10 mx-auto mb-4" />
                             <p>{t('videoIntegrity.pendingText')}</p>
                         </div>
+                        )}
+                        {rawErrorResponse && (
+                          <div className="flex-1 flex flex-col min-h-0">
+                            <h3 className="font-semibold text-lg mb-2 px-1 text-destructive">Raw AI Response</h3>
+                            <ScrollArea className="flex-1 pr-4 -mr-4">
+                                <pre className="text-sm leading-relaxed text-destructive/80 whitespace-pre-wrap break-words bg-destructive/10 p-4 rounded-md">
+                                    {rawErrorResponse}
+                                </pre>
+                            </ScrollArea>
+                          </div>
                         )}
                         {result && (
                           <div className="flex-1 flex flex-col min-h-0">

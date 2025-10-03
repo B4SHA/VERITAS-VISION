@@ -38,9 +38,10 @@ const VideoIntegrityOutputSchema = z.object({
 
 export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
 export type VideoIntegrityOutput = z.infer<typeof VideoIntegrityOutputSchema>;
+export type VideoIntegrityError = { error: string; rawResponse: string };
 
 
-export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
+export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput | VideoIntegrityError> {
   const videoPart = dataUriToGenerativePart(input.videoDataUri);
 
   const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation.
@@ -92,6 +93,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
         }
     } catch (e) {
         console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-        throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
+        return { error: 'PARSING_FAILED', rawResponse: text };
     }
 }
