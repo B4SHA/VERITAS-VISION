@@ -66,8 +66,6 @@ const model = genAI.getGenerativeModel({
             threshold: HarmBlockThreshold.BLOCK_NONE,
         },
     ],
-    // @ts-ignore
-    tools: [fetchUrlTool, { "google_search": {} }],
 });
 
 async function fetchUrl(url: string): Promise<string> {
@@ -117,7 +115,10 @@ The output language for the report must be in the language specified by the user
 ${articleInfo}
 `;
     
-    const chat = model.startChat();
+    const chat = model.startChat({
+        tools: [fetchUrlTool, { "google_search": {} }],
+    });
+
     const result = await chat.sendMessage(prompt);
     let response = result.response;
 
