@@ -65,8 +65,6 @@ export async function newsSleuthAnalysis(
     const functionCalls = response.functionCalls();
     if (functionCalls) {
          for (const call of functionCalls) {
-            // This is a specific check for the googleSearch tool defined in the model.
-            // It assumes a structure where the tool call arguments contain a 'results' array.
             if (call.name === 'googleSearch' && call.args && Array.isArray((call.args as any).results)) {
                  sources = (call.args as any).results.map((r: any) => r.uri).filter(Boolean);
             }
