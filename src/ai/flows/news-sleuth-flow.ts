@@ -80,7 +80,7 @@ const newsSleuthPrompt = ai.definePrompt({
     },
     output: { schema: NewsSleuthOutputSchema },
     // Tools are now 'googleSearch' (built-in) AND our custom tool
-    tools: ['googleSearch', fetchUrlTool.name], 
+    tools: ['googleSearch', fetchUrlTool], 
     prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
 
 **Your Task:**
