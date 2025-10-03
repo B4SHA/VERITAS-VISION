@@ -7,11 +7,12 @@
  * analyzes news articles for credibility by calling the Gemini API directly.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, type GenerateContentRequest } from '@google/generative-ai';
 import {
   type NewsSleuthInput,
   type NewsSleuthOutput,
   type NewsSleuthError,
+  NewsSleuthOutputSchema,
 } from '@/ai/schemas';
 
 if (!process.env.GEMINI_API_KEY) {
@@ -19,46 +20,8 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', tools: [{googleSearch: {}}] });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-
-const NewsSleuthOutputJsonSchema = {
-    "type": "object",
-    "properties": {
-        "overallScore": {
-            "type": "number",
-            "description": "A credibility score from 0 to 100."
-        },
-        "verdict": {
-            "type": "string",
-            "enum": ['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis'],
-            "description": "The final judgment on the article's credibility."
-        },
-        "summary": {
-            "type": "string",
-            "description": "A brief summary of the article's main points."
-        },
-        "biases": {
-            "type": "string",
-            "description": "An analysis of any detected biases (e.g., political, commercial)."
-        },
-        "flaggedContent": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims."
-        },
-        "reasoning": {
-            "type": "string",
-            "description": "The reasoning behind the overall verdict and score."
-        },
-        "sources": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "A list of URLs used to corroborate facts. This MUST be populated from the search results."
-        }
-    },
-    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
-};
 
 export async function newsSleuthAnalysis(
   input: NewsSleuthInput
@@ -73,47 +36,50 @@ export async function newsSleuthAnalysis(
     Your task is to analyze the provided article information for credibility and generate a report.
     
     1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
-    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
+    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article.
     3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search.
+    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search. If you are not given a URL and cannot perform a search, this array must be empty.
     5.  You MUST output your final report in ${input.language}.
     6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
-    JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
+    JSON Schema: ${JSON.stringify(NewsSleuthOutputSchema.jsonSchema)}
 
     Article Info:
     ${articleInfo}
   `;
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    });
+
+    const request: GenerateContentRequest = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: NewsSleuthOutputSchema.jsonSchema,
+        },
+    };
+
+    if (input.articleUrl) {
+        request.tools = [{ googleSearch: {} }];
+    }
+
+    const result = await model.generateContent(request);
 
     const response = result.response;
-    let responseText = response.text();
-    
-    if (!responseText) {
-        throw new Error("The AI model returned an empty response.");
-    }
-    
     let output: NewsSleuthOutput;
-    try {
-        // Find the start and end of the JSON object
-        const startIndex = responseText.indexOf('{');
-        const endIndex = responseText.lastIndexOf('}');
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            responseText = responseText.substring(startIndex, endIndex + 1);
-        }
-        output = JSON.parse(responseText);
-    } catch(e) {
-        console.error("Failed to parse JSON from model response:", responseText);
-        throw new Error("The AI model returned an invalid JSON format. Please try again.");
-    }
+    
+    // The response is already a parsed JSON object because of responseMimeType
+    output = response.text() as unknown as NewsSleuthOutput;
     
     return output;
+
   } catch (error: any) {
     console.error('API Error:', error);
+    if (error.message.includes('SAFETY')) {
+        return {
+          error: 'API_SAFETY_ERROR',
+          details: 'The analysis was blocked due to the content safety policy. The article may contain sensitive topics.',
+        };
+    }
     return {
       error: 'API_EXECUTION_FAILED',
       details: error.message || 'The AI model failed to generate a response.',
