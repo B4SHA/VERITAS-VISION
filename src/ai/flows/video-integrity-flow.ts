@@ -1,10 +1,8 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { dataUriToGenerativePart, cleanJsonSchema } from "@/lib/utils";
 
 const VideoIntegrityInputSchema = z.object({
   videoDataUri: z
@@ -35,44 +33,17 @@ const VideoIntegrityOutputSchema = z.object({
 export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
 export type VideoIntegrityOutput = z.infer<typeof VideoIntegrityOutputSchema>;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const jsonSchema = zodToJsonSchema(VideoIntegrityOutputSchema);
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    // @ts-ignore
-    tools: [{ "google_search": {} }],
-});
-
-export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
-    const videoPart = dataUriToGenerativePart(input.videoDataUri);
-
+const videoIntegrityRunner = ai.defineFlow(
+  {
+    name: 'videoIntegrityRunner',
+    inputSchema: VideoIntegrityInputSchema,
+    outputSchema: VideoIntegrityOutputSchema,
+  },
+  async (input) => {
     const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
-Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
-
-JSON Schema:
-\`\`\`json
-${JSON.stringify(cleanJsonSchema(jsonSchema))}
-\`\`\`
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
@@ -96,19 +67,30 @@ The output language for the report and analysis must be in the language specifie
 
 Video for analysis is provided in the content.`;
 
-    const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [videoPart, { text: prompt }] }],
+    const llmResponse = await ai.generate({
+      model: 'gemini-2.5-flash',
+      prompt: [
+        {
+          media: {
+            url: input.videoDataUri,
+          },
+        },
+        { text: prompt },
+      ],
+      output: {
+        schema: VideoIntegrityOutputSchema,
+      },
+      tools: [{ name: 'googleSearch' }],
     });
 
-    const responseText = result.response.text();
-    try {
-        const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonMatch && jsonMatch[1]) {
-            return VideoIntegrityOutputSchema.parse(JSON.parse(jsonMatch[1]));
-        }
-        return VideoIntegrityOutputSchema.parse(JSON.parse(responseText));
-    } catch (e) {
-        console.error("Failed to parse JSON response from model:", responseText);
-        throw new Error("Invalid response from the model. Please try again.");
+    const output = llmResponse.output();
+    if (!output) {
+      throw new Error('No output from model');
     }
+    return output;
+  }
+);
+
+export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
+    return await videoIntegrityRunner(input);
 }

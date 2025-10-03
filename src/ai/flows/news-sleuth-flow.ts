@@ -1,10 +1,8 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { cleanJsonSchema } from "@/lib/utils";
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -28,76 +26,54 @@ const NewsSleuthOutputSchema = z.object({
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+const newsSleuthRunner = ai.defineFlow(
+  {
+    name: 'newsSleuthRunner',
+    inputSchema: NewsSleuthInputSchema,
+    outputSchema: NewsSleuthOutputSchema,
+  },
+  async (input) => {
+    let articleInfo = '';
+    if (input.articleText) {
+      articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
+    }
+    if (input.articleHeadline) {
+      articleInfo += `Headline: "${input.articleHeadline}"\n`;
+    }
+    if (input.articleUrl) {
+      articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
+    }
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    // @ts-ignore
-    tools: [{ "google_search": {} }],
-});
-
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-  let articleInfo = '';
-  if (input.articleText) {
-    articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
-  }
-  if (input.articleHeadline) {
-    articleInfo += `Headline: "${input.articleHeadline}"\n`;
-  }
-  if (input.articleUrl) {
-    articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
-  }
-  
-  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
+    const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
 
 **Instructions:**
 1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
 2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
-3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
-
-JSON Schema:
-\`\`\`json
-${JSON.stringify(cleanJsonSchema(jsonSchema))}
-\`\`\`
+3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
 The output language must be: **${input.language}**.
 
-**Article Information for Analysis:**
+Article Information for Analysis:
 ${articleInfo}
 `;
 
-  const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
+    const llmResponse = await ai.generate({
+      model: 'gemini-2.5-flash',
+      prompt: prompt,
+      output: {
+        schema: NewsSleuthOutputSchema,
+      },
+      tools: [{ name: 'googleSearch' }],
+    });
 
-  const responseText = result.response.text();
-  try {
-    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-        return NewsSleuthOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    const output = llmResponse.output();
+    if (!output) {
+      throw new Error('No output from model');
     }
-    return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
-  } catch (e) {
-    console.error("Failed to parse JSON response from model:", responseText);
-    throw new Error("Invalid response from the model. Please try again.");
+    return output;
   }
+);
+
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
+  return await newsSleuthRunner(input);
 }

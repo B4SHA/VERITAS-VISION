@@ -1,10 +1,8 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { dataUriToGenerativePart, cleanJsonSchema } from "@/lib/utils";
 
 const ImageVerifierInputSchema = z.object({
   imageDataUri: z
@@ -32,44 +30,17 @@ const ImageVerifierOutputSchema = z.object({
 export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const jsonSchema = zodToJsonSchema(ImageVerifierOutputSchema);
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    // @ts-ignore
-    tools: [{ "google_search": {} }],
-});
+const imageVerifierRunner = ai.defineFlow(
+  {
+    name: 'imageVerifierRunner',
+    inputSchema: ImageVerifierInputSchema,
+    outputSchema: ImageVerifierOutputSchema,
+  },
+  async (input) => {
+    const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
 
-export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
-  const imagePart = dataUriToGenerativePart(input.imageDataUri);
-  
-  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
-
-Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
-
-JSON Schema:
-\`\`\`json
-${JSON.stringify(cleanJsonSchema(jsonSchema))}
-\`\`\`
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
 You will perform the following analysis:
 1.  **AI Generation Detection**: Analyze the image for artifacts characteristic of AI image synthesis (e.g., GANs, diffusion models). Look for tell-tale signs in textures, backgrounds, lighting, and anatomical details.
@@ -83,19 +54,31 @@ The output language for the report and analysis must be in the language specifie
 
 Image for analysis is provided in the content.`;
 
-  const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-  });
+    const llmResponse = await ai.generate({
+      model: 'gemini-2.5-flash',
+      prompt: [
+        {
+          media: {
+            url: input.imageDataUri,
+          },
+        },
+        { text: prompt },
+      ],
+      output: {
+        schema: ImageVerifierOutputSchema,
+      },
+      tools: [{ name: 'googleSearch' }],
+    });
 
-  const responseText = result.response.text();
-  try {
-    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-        return ImageVerifierOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    const output = llmResponse.output();
+    if (!output) {
+      throw new Error('No output from model');
     }
-    return ImageVerifierOutputSchema.parse(JSON.parse(responseText));
-  } catch (e) {
-    console.error("Failed to parse JSON response from model:", responseText);
-    throw new Error("Invalid response from the model. Please try again.");
+    return output;
   }
+);
+
+
+export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
+    return await imageVerifierRunner(input);
 }

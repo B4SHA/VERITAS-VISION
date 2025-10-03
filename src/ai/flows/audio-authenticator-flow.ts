@@ -1,10 +1,8 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { dataUriToGenerativePart, cleanJsonSchema } from "@/lib/utils";
 
 const AudioAuthenticatorInputSchema = z.object({
   audioDataUri: z
@@ -28,44 +26,16 @@ const AudioAuthenticatorOutputSchema = z.object({
 export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSchema>;
 export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSchema>;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const jsonSchema = zodToJsonSchema(AudioAuthenticatorOutputSchema);
+const audioAuthenticatorRunner = ai.defineFlow(
+  {
+    name: 'audioAuthenticatorRunner',
+    inputSchema: AudioAuthenticatorInputSchema,
+    outputSchema: AudioAuthenticatorOutputSchema,
+  },
+  async (input) => {
+    const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    // @ts-ignore
-    tools: [{ "google_search": {} }],
-});
-
-export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
-  const audioPart = dataUriToGenerativePart(input.audioDataUri);
-
-  const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
-
-Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
-
-JSON Schema:
-\`\`\`json
-${JSON.stringify(cleanJsonSchema(jsonSchema))}
-\`\`\`
+Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting.
 
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
@@ -80,20 +50,31 @@ The output language for the report and analysis must be in the language specifie
 
 Audio for analysis is provided in the content.`;
 
-  const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [audioPart, { text: prompt }] }],
-  });
+    const llmResponse = await ai.generate({
+      model: 'gemini-2.5-flash',
+      prompt: [
+        {
+          media: {
+            url: input.audioDataUri,
+          },
+        },
+        { text: prompt },
+      ],
+      output: {
+        schema: AudioAuthenticatorOutputSchema,
+      },
+      tools: [{ name: 'googleSearch' }],
+    });
 
-  const responseText = result.response.text();
-  try {
-    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-        return AudioAuthenticatorOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    const output = llmResponse.output();
+    if (!output) {
+      throw new Error('No output from model');
     }
-    return AudioAuthenticatorOutputSchema.parse(JSON.parse(responseText));
-  } catch (e) {
-    console.error("Failed to parse JSON response from model:", responseText);
-    throw new Error("Invalid response from the model. Please try again.");
+    return output;
   }
-}
+);
 
+
+export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
+    return await audioAuthenticatorRunner(input);
+}
