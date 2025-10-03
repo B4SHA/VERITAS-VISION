@@ -135,8 +135,8 @@ export function NewsSleuth() {
   }
 
   const getProgressIndicatorClassName = (score: number) => {
-    if (score < 40) return "bg-destructive";
-    if (score < 70) return "bg-accent";
+    if (score < 2) return "bg-destructive";
+    if (score < 3.5) return "bg-accent";
     return "bg-primary";
   };
   
@@ -144,14 +144,30 @@ export function NewsSleuth() {
     const lowerAssessment = assessment.toLowerCase();
     if (lowerAssessment.includes('very low') || lowerAssessment.includes('unreliable') || lowerAssessment.includes('sensationalist')) return 'destructive';
     if (lowerAssessment.includes('low') || lowerAssessment.includes('weak')) return 'destructive';
-    if (lowerAssessment.includes('medium')) return 'secondary';
+    if (lowerAssessment.includes('medium') || lowerAssessment.includes('moderate')) return 'secondary';
     if (lowerAssessment.includes('high') || lowerAssessment.includes('reliable') || lowerAssessment.includes('neutral')) return 'default';
     return 'secondary';
   };
 
+  const AnalysisItem = ({ title, assessment, points }: { title: string, assessment: string, points: string[] }) => (
+    <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
+      <AccordionTrigger>
+        <div className="flex items-center justify-between w-full">
+          <span>{title}</span>
+          <Badge variant={getAssessmentBadgeVariant(assessment)}>{assessment}</Badge>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent>
+        <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+          {points.map((point, i) => <li key={i}>{point}</li>)}
+        </ul>
+      </AccordionContent>
+    </AccordionItem>
+  );
+
   return (
     <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
-      <div className="container mx-auto flex flex-col items-center gap-8 max-w-5xl">
+      <div className="container mx-auto flex flex-col items-center gap-8 max-w-7xl">
         <div className="text-center w-full">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tighter text-foreground mb-2">
             {t('newsSleuth.title')}
@@ -285,7 +301,7 @@ export function NewsSleuth() {
           
           <Card className="w-full shadow-lg border-2 border-border/80 bg-background/80 backdrop-blur-sm flex flex-col min-h-[500px] lg:min-h-[700px]">
             <CardHeader>
-              <CardTitle className="text-xl">{t('newsSleuth.reportTitle')}</CardTitle>
+              <CardTitle className="text-xl">{result ? result.report_title : t('newsSleuth.reportTitle')}</CardTitle>
               <CardDescription>
                 {t('newsSleuth.reportDescription')}
               </CardDescription>
@@ -314,107 +330,80 @@ export function NewsSleuth() {
                 </div>
               )}
               {result && (
-                 <div className="flex-1 flex flex-col min-h-0">
-                    <div className="px-1 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-lg">Overall Credibility Score</h3>
-                            <span className="font-bold text-2xl text-primary">{result.overall_credibility_score.score}/100</span>
-                        </div>
-                        <Progress value={result.overall_credibility_score.score} indicatorClassName={getProgressIndicatorClassName(result.overall_credibility_score.score)} />
-                         <p className="text-sm text-muted-foreground">{result.overall_credibility_score.description}</p>
-                    </div>
-                    <Separator className="my-4" />
-                    <div className="flex-1 min-h-0">
-                        <ScrollArea className="h-full pr-4">
-                            <div className="space-y-6">
+                 <ScrollArea className="h-full pr-4">
+                  <div className="space-y-6">
 
-                              <Accordion type="single" collapsible defaultValue="item-1">
-                                <AccordionItem value="item-1">
-                                  <AccordionTrigger>
-                                    <div className="flex items-center justify-between w-full">
-                                      <span>Factual Accuracy</span>
-                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.factual_accuracy.assessment)}>{result.credibility_analysis.factual_accuracy.assessment}</Badge>
-                                    </div>
-                                  </AccordionTrigger>
-                                  <AccordionContent>
-                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.factual_accuracy.details}</p>
-                                  </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="item-2">
-                                  <AccordionTrigger>
-                                     <div className="flex items-center justify-between w-full">
-                                      <span>Sourcing</span>
-                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.sourcing.assessment)}>{result.credibility_analysis.sourcing.assessment}</Badge>
-                                    </div>
-                                  </AccordionTrigger>
-                                  <AccordionContent>
-                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.sourcing.details}</p>
-                                  </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="item-3">
-                                  <AccordionTrigger>
-                                     <div className="flex items-center justify-between w-full">
-                                      <span>Bias and Tone</span>
-                                      <Badge variant={getAssessmentBadgeVariant(result.credibility_analysis.bias_and_tone.assessment)}>{result.credibility_analysis.bias_and_tone.assessment}</Badge>
-                                    </div>
-                                  </AccordionTrigger>
-                                  <AccordionContent>
-                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.bias_and_tone.details}</p>
-                                  </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="item-4">
-                                  <AccordionTrigger>Author and Publication Reputation</AccordionTrigger>
-                                  <AccordionContent>
-                                    <div className="space-y-2">
-                                      <p className="text-sm font-semibold">Publication Reputation:</p>
-                                      <p className="text-sm text-muted-foreground">{result.credibility_analysis.author_and_publication_reputation.publication_reputation}</p>
-                                      <p className="text-sm font-semibold mt-2">Author Expertise:</p>
-                                      <p className="text-sm text-muted-foreground">{result.credibility_analysis.author_and_publication_reputation.author_expertise}</p>
-                                    </div>
-                                  </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="item-5">
-                                  <AccordionTrigger>
-                                    <div className="flex items-center justify-between w-full">
-                                      <span>Logical Fallacies</span>
-                                       <Badge variant={result.credibility_analysis.logical_fallacies.present ? 'destructive' : 'default'}>{result.credibility_analysis.logical_fallacies.present ? "Present" : "Not Present"}</Badge>
-                                    </div>
-                                  </AccordionTrigger>
-                                  <AccordionContent>
-                                    <p className="text-sm text-muted-foreground">{result.credibility_analysis.logical_fallacies.details}</p>
-                                  </AccordionContent>
-                                </AccordionItem>
+                      <Card>
+                          <CardHeader>
+                              <CardTitle className="text-lg">Overall Score</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                              <div className="flex items-baseline gap-4">
+                                <span className="font-bold text-5xl text-primary">{result.overall_credibility_score.score.toFixed(1)}</span>
+                                <span className="text-muted-foreground text-lg">/ 5.0</span>
+                              </div>
+                              <Progress value={result.overall_credibility_score.score * 20} indicatorClassName={getProgressIndicatorClassName(result.overall_credibility_score.score)} className="my-3"/>
+                              <p className="text-sm text-muted-foreground">{result.overall_credibility_score.reasoning}</p>
+                          </CardContent>
+                      </Card>
+
+                      <Accordion type="multiple" defaultValue={['analysis']} className="w-full">
+                        <AccordionItem value="analysis">
+                          <AccordionTrigger className="text-lg font-semibold">Detailed Analysis</AccordionTrigger>
+                          <AccordionContent>
+                              <Accordion type="multiple" className="w-full space-y-1">
+                                <AnalysisItem title="Factual Accuracy" assessment={result.analysis.factual_accuracy.assessment} points={result.analysis.factual_accuracy.supporting_points} />
+                                <AnalysisItem title="Source Reliability" assessment={result.analysis.source_reliability.assessment} points={result.analysis.source_reliability.supporting_points} />
+                                <AnalysisItem title="Bias & Manipulation" assessment={result.analysis.bias_manipulation.assessment} points={result.analysis.bias_manipulation.supporting_points} />
+                                <AnalysisItem title="Author Expertise" assessment={result.analysis.author_expertise.assessment} points={result.analysis.author_expertise.supporting_points} />
                               </Accordion>
+                          </AccordionContent>
+                        </AccordionItem>
 
-                                <Separator />
-                                <Alert>
-                                  <Icons.shield className="h-4 w-4" />
-                                  <AlertTitle>Conclusion & Recommendation</AlertTitle>
-                                  <AlertDescription>
-                                    <p className="font-semibold mt-2">Summary:</p>
-                                    <p className="text-sm text-muted-foreground mt-1">{result.conclusion_and_recommendation.summary}</p>
-                                    <p className="font-semibold mt-4">Reader Advice:</p>
-                                    <p className="text-sm text-muted-foreground mt-1">{result.conclusion_and_recommendation.reader_advice}</p>
-                                  </AlertDescription>
-                                </Alert>
+                        <AccordionItem value="recommendations">
+                          <AccordionTrigger className="text-lg font-semibold">Recommendations</AccordionTrigger>
+                          <AccordionContent>
+                            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                                {result.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                            </ul>
+                          </AccordionContent>
+                        </AccordionItem>
 
-                                <Separator />
-                                <div>
-                                    <h3 className="font-semibold text-lg mb-2">Article Information</h3>
-                                     <div className="text-sm text-muted-foreground space-y-1">
-                                        <p><span className="font-semibold text-foreground">Title:</span> {result.article_info.title}</p>
-                                        {result.article_info.url && <p><span className="font-semibold text-foreground">URL:</span> <Link href={result.article_info.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{result.article_info.url}</Link></p>}
-                                        {result.article_info.publication && <p><span className="font-semibold text-foreground">Publication:</span> {result.article_info.publication}</p>}
-                                        {result.article_info.author && <p><span className="font-semibold text-foreground">Author:</span> {result.article_info.author}</p>}
-                                        {result.article_info.publication_date && <p><span className="font-semibold text-foreground">Date:</span> {result.article_info.publication_date}</p>}
-                                        {result.article_info.category && <p><span className="font-semibold text-foreground">Category:</span> {result.article_info.category}</p>}
-                                     </div>
+                        <AccordionItem value="details">
+                          <AccordionTrigger className="text-lg font-semibold">Article & Publication Details</AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="text-base">Article Details</CardTitle>
+                              </CardHeader>
+                              <CardContent className="text-sm space-y-1">
+                                <p><span className="font-semibold text-foreground">Title:</span> {result.article_details.title}</p>
+                                <p><span className="font-semibold text-foreground">Author:</span> {result.article_details.author}</p>
+                                <p><span className="font-semibold text-foreground">Date:</span> {result.article_details.publication_date}</p>
+                                <p><span className="font-semibold text-foreground">Main Claim:</span> {result.article_details.main_claim}</p>
+                                <p><span className="font-semibold text-foreground">URL:</span> <Link href={result.article_details.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{result.article_details.url}</Link></p>
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                  <span className="font-semibold text-foreground">Keywords:</span>
+                                  {result.article_details.keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}
                                 </div>
+                              </CardContent>
+                            </Card>
+                             <Card>
+                              <CardHeader>
+                                <CardTitle className="text-base">Publication Details</CardTitle>
+                              </CardHeader>
+                              <CardContent className="text-sm space-y-1">
+                                <p><span className="font-semibold text-foreground">Name:</span> <Link href={result.publication_details.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{result.publication_details.name}</Link></p>
+                                <p><span className="font-semibold text-foreground">Type:</span> {result.publication_details.publication_type}</p>
+                                <p><span className="font-semibold text-foreground">Reputation:</span> {result.publication_details.reputation}</p>
+                              </CardContent>
+                            </Card>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
 
-                            </div>
-                        </ScrollArea>
-                    </div>
-                 </div>
+                  </div>
+                </ScrollArea>
               )}
             </CardContent>
           </Card>

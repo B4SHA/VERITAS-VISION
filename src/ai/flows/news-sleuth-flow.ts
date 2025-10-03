@@ -20,48 +20,48 @@ const NewsSleuthInputSchema = z.object({
   language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
 });
 
+const PublicationDetailsSchema = z.object({
+  name: z.string(),
+  url: z.string().url(),
+  publication_type: z.string(),
+  reputation: z.string(),
+});
+
+const ArticleDetailsSchema = z.object({
+  title: z.string(),
+  url: z.string().url(),
+  author: z.string(),
+  publication_date: z.string(),
+  main_claim: z.string(),
+  keywords: z.array(z.string()),
+});
+
 const AnalysisDetailSchema = z.object({
   assessment: z.string(),
-  details: z.string(),
+  supporting_points: z.array(z.string()),
 });
 
-const AuthorReputationSchema = z.object({
-  publication_reputation: z.string(),
-  author_expertise: z.string(),
+const AnalysisSchema = z.object({
+  factual_accuracy: AnalysisDetailSchema,
+  source_reliability: AnalysisDetailSchema,
+  bias_manipulation: AnalysisDetailSchema,
+  author_expertise: AnalysisDetailSchema,
 });
 
-const LogicalFallaciesSchema = z.object({
-  present: z.boolean(),
-  details: z.string(),
+const OverallCredibilityScoreSchema = z.object({
+  score: z.number(),
+  scale: z.string(),
+  reasoning: z.string(),
 });
 
 const NewsSleuthOutputSchema = z.object({
   report_title: z.string(),
-  article_info: z.object({
-    title: z.string(),
-    url: z.string().optional(),
-    publication: z.string().optional(),
-    author: z.string().optional(),
-    publication_date: z.string().optional(),
-    category: z.string().optional(),
-  }),
-  credibility_analysis: z.object({
-    factual_accuracy: AnalysisDetailSchema,
-    sourcing: AnalysisDetailSchema,
-    bias_and_tone: AnalysisDetailSchema,
-    author_and_publication_reputation: AuthorReputationSchema,
-    logical_fallacies: LogicalFallaciesSchema,
-  }),
-  overall_credibility_score: z.object({
-    score: z.number().describe('A credibility score from 0 to 100.'),
-    description: z.string(),
-  }),
-  conclusion_and_recommendation: z.object({
-    summary: z.string(),
-    reader_advice: z.string(),
-  }),
+  publication_details: PublicationDetailsSchema,
+  article_details: ArticleDetailsSchema,
+  analysis: AnalysisSchema,
+  overall_credibility_score: OverallCredibilityScoreSchema,
+  recommendations: z.array(z.string()),
 });
-
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
