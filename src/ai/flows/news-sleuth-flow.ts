@@ -3,28 +3,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { getWebPageContent as getWebPageContentTool } from '@/ai/tools/web-loader';
-
-const getWebPageContent = ai.defineTool(
-    {
-      name: 'getWebPageContent',
-      description: 'Fetches the text content of a given web page URL. Use this to get the full story from a URL.',
-      inputSchema: z.object({ url: z.string().url().describe('The URL of the article to fetch.') }),
-      outputSchema: z.object({
-        content: z.string().optional(),
-        error: z.string().optional(),
-      }),
-    },
-    async ({ url }) => {
-      try {
-        const content = await getWebPageContentTool(url);
-        return { content };
-      } catch (e: any) {
-        return { error: `Failed to fetch content from ${url}: ${e.message}` };
-      }
-    }
-);
-
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -58,7 +36,6 @@ const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
-    tools: [getWebPageContent],
     prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided text, URL, or headline and deliver a comprehensive credibility report. You have the ability to browse the web.
 
 **Input:**
@@ -66,7 +43,7 @@ You will receive one of the following: the full text of an article, a URL to an 
 
 **Your Task:**
 1.  **Gather Information:**
-    *   If given a URL, you MUST use the 'getWebPageContent' tool to fetch the article content.
+    *   If given a URL, you MUST use the search tool to fetch the article content.
     *   If given only a headline or short text, you MUST perform a web search to find the full article and other related reports from various sources.
 2.  **Analyze the Content:**
     *   Assess the language for sensationalism, emotional manipulation, and logical fallacies.

@@ -41,7 +41,7 @@ You will perform the following analysis:
 2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it.
 3.  **Content Analysis & Web Search**:
     *   Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
-    *   You MUST perform a web search based on the transcribed text, speakers, or key topics to find context. Look for fact-checks, news reports, or the original source of the audio.
+    *   You MUST perform a web search based on the transcribed text, speakers, or key topics to find context. Look for fact-checks, news reports, or the original source of the audio. Use the search tool to do this.
 4.  **Verdict and Confidence**: Based on all available evidence (forensic and web search), provide a final verdict: 'Likely Authentic', 'Potential AI/Manipulation', or 'Uncertain'. Also, provide a confidence score (0-100) for your verdict.
 5.  **Reporting**: Generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
 
@@ -62,3 +62,4 @@ const audioAuthenticatorFlow = ai.defineFlow(
     return output!;
   }
 );
+
