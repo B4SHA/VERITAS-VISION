@@ -43,7 +43,10 @@ const prompt = ai.definePrompt({
     name: 'videoIntegrityPrompt',
     input: { schema: VideoIntegrityInputSchema },
     output: { schema: VideoIntegrityOutputSchema },
-    prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have the ability to browse the web.
+    config: {
+      grounding: 'web',
+    },
+    prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation, grounded in real-time web search results.
 
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
@@ -56,7 +59,7 @@ You will perform a multi-modal analysis:
     *   Transcribe any spoken words in the video.
     *   Analyze the transcribed text for misinformation, propaganda, or out-of-context statements.
 4.  **Contextual Web Search**:
-    *   Based on the visual content, transcribed text, and any identifiable people or locations, you MUST perform a web search. Use the search tool to do this.
+    *   Based on the visual content, transcribed text, and any identifiable people or locations, you MUST perform a web search.
     *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
 5.  **Overall Assessment**:
     *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
@@ -80,4 +83,3 @@ const videoIntegrityFlow = ai.defineFlow(
     return output!;
   }
 );
-
