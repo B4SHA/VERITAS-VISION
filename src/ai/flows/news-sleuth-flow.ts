@@ -8,8 +8,8 @@ import { getWebPageContent as getWebPageContentTool } from '@/ai/tools/web-loade
 const getWebPageContent = ai.defineTool(
     {
       name: 'getWebPageContent',
-      description: 'Fetches the text content of a given web page URL.',
-      inputSchema: z.object({ url: z.string().url() }),
+      description: 'Fetches the text content of a given web page URL. Use this to get the full story from a URL.',
+      inputSchema: z.object({ url: z.string().url().describe('The URL of the article to fetch.') }),
       outputSchema: z.object({
         content: z.string().optional(),
         error: z.string().optional(),
@@ -23,7 +23,7 @@ const getWebPageContent = ai.defineTool(
         return { error: `Failed to fetch content from ${url}: ${e.message}` };
       }
     }
-  );
+);
 
 
 const NewsSleuthInputSchema = z.object({
@@ -59,31 +59,31 @@ const prompt = ai.definePrompt({
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
     tools: [getWebPageContent],
-    prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided text, URL, or headline and deliver a comprehensive credibility report.
+    prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided text, URL, or headline and deliver a comprehensive credibility report. You have the ability to browse the web.
 
 **Input:**
 You will receive one of the following: the full text of an article, a URL to an online article, or just a headline.
 
 **Your Task:**
-1.  **Analyze the Content:**
-    *   If given a URL, you MUST use the 'getWebPageContent' tool to fetch the article content. If the tool fails, base your analysis on the error and the URL itself.
+1.  **Gather Information:**
+    *   If given a URL, you MUST use the 'getWebPageContent' tool to fetch the article content.
+    *   If given only a headline or short text, you MUST perform a web search to find the full article and other related reports from various sources.
+2.  **Analyze the Content:**
     *   Assess the language for sensationalism, emotional manipulation, and logical fallacies.
     *   Identify the main claims made in the article.
-2.  **Fact-Check Claims:**
-    *   Cross-reference the main claims with information from a diverse range of reputable, neutral sources (e.g., major news agencies, academic institutions, official reports).
+3.  **Fact-Check Claims:**
+    *   Cross-reference the main claims with information from a diverse range of reputable, neutral sources you find through web searches (e.g., major news agencies, academic institutions, official reports).
     *   Verify data, statistics, and quotes.
-3.  **Source & Author Analysis:**
+4.  **Source & Author Analysis:**
     *   Investigate the reputation of the publication and the author (if available).
     *   Look for any conflicts of interest, historical biases, or patterns of spreading misinformation.
-4.  **Identify Biases:**
-    *   Detect and list any political, ideological, or commercial biases present in the article.
 5.  **Generate Credibility Report:**
     *   **Overall Score:** Assign a credibility score from 0 (completely false) to 100 (highly credible).
     *   **Verdict:** Provide a clear verdict: 'Likely Real', 'Likely Fake', or 'Uncertain'.
     *   **Summary:** Write a concise summary of your findings.
     *   **Biases:** List the specific biases you identified.
     *   **Flagged Content:** Quote specific sentences or phrases that are factually incorrect, misleading, or unsubstantiated.
-    *   **Reasoning:** Provide a detailed, step-by-step explanation for your conclusion, citing evidence.
+    *   **Reasoning:** Provide a detailed, step-by-step explanation for your conclusion, citing evidence from the web.
     *   **Sources:** List the URLs of the primary sources you used for fact-checking.
 
 The output language for the report must be in the language specified by the user: {{{language}}}.
