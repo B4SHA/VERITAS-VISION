@@ -30,11 +30,11 @@ const formSchema = z.object({
   articleHeadline: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.inputType === 'text') {
-    if (!data.articleText || data.articleText.length < 100) {
+    if (!data.articleText || data.articleText.length < 50) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['articleText'],
-        message: 'Article text must be at least 100 characters long.',
+        message: 'Article text must be at least 50 characters long.',
       });
     }
     if (data.articleText && data.articleText.length > 15000) {
@@ -367,7 +367,7 @@ export function NewsSleuth() {
                           </CardContent>
                       </Card>
 
-                      <Accordion type="multiple" defaultValue={['reasoning', 'flagged-content', 'sources']} className="w-full">
+                      <Accordion type="multiple" defaultValue={['reasoning', 'flagged-content', 'sources', 'biases']} className="w-full">
                         <AnalysisItem title="Reasoning" content={report.reasoning} />
                         <AnalysisItem title="Biases" content={report.biases} />
                         <AnalysisItem title="Flagged Content" content={report.flaggedContent} />

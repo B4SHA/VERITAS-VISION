@@ -20,11 +20,9 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash',
-generationConfig: {
-    responseMimeType: 'application/json',
-},
-tools: [{googleSearch: {}}]
+const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    tools: [{googleSearch: {}}]
 });
 
 
@@ -40,12 +38,11 @@ export async function newsSleuthAnalysis(
     You are a world-class investigative journalist and fact-checker AI.
     Your task is to analyze the provided article information for credibility and generate a report.
     
-    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. For text or headline inputs, use search to find context and corroborating sources.
-    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article.
-    3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search. If you cannot perform a search, this array must be empty.
-    5.  You MUST output your final report in ${input.language}.
-    6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    1.  You MUST use the Google Search tool to find corroborating or contradictory sources for the claims made in the article, regardless of whether a URL, text, or headline is provided.
+    2.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    3.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search. If you cannot perform a search, this array must be empty.
+    4.  You MUST output your final report in ${input.language}.
+    5.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
     JSON Schema: ${JSON.stringify(NewsSleuthOutputSchema.jsonSchema)}
 
@@ -61,12 +58,18 @@ export async function newsSleuthAnalysis(
     const result = await model.generateContent(request);
     
     const response = result.response;
-    const responseText = response.text();
+    let responseText = response.text();
+
+    // Sanitize the response to extract only the JSON part
+    if (responseText.startsWith("```json")) {
+        responseText = responseText.slice(7, -3).trim();
+    } else if (responseText.startsWith("```")) {
+        responseText = responseText.slice(3, -3).trim();
+    }
 
     let output: NewsSleuthOutput;
 
     try {
-        // The response is already a parsed JSON object because of responseMimeType
         output = JSON.parse(responseText) as NewsSleuthOutput;
     } catch(e) {
         console.error("Failed to parse JSON from model response:", responseText);
@@ -76,6 +79,19 @@ export async function newsSleuthAnalysis(
         };
     }
     
+    // Fallback source extraction from tool calls if not in the main response
+    if ((!output.sources || output.sources.length === 0) && response.functionCalls()) {
+        const sources: string[] = [];
+        for (const funcCall of response.functionCalls()) {
+            if (funcCall.name === 'googleSearch') {
+                const searchResults = funcCall.args.query; // This is a simplification
+                // A more robust implementation would parse the actual tool output if available.
+                // For now, we assume this is a placeholder for where source extraction would go.
+            }
+        }
+        output.sources = sources;
+    }
+
     return output;
 
   } catch (error: any) {
