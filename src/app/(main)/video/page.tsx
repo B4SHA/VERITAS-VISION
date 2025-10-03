@@ -18,7 +18,7 @@ export default function VideoPage() {
         <div className="flex flex-col items-center justify-center h-full text-foreground">
             <div className="grid md:grid-cols-2 gap-16 items-center max-w-6xl mx-auto">
                 <div className="space-y-8">
-                    <h1 className="text-4xl md:text-6xl font-bold font-headline">
+                    <h1 className="text-4xl md:text-6xl font-bold font-heading">
                         {t('video_integrity_title')}
                     </h1>
                     <p className="text-lg text-muted-foreground">

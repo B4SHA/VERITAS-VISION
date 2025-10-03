@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { ArrowDown, Check, ShieldCheck } from "lucide-react";
+import { ArrowDown, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useLanguage } from "@/hooks/use-language";
 
 export default function Home() {
 
@@ -11,7 +10,7 @@ export default function Home() {
         <section className="relative flex items-center justify-center h-[calc(100vh-4rem)] text-center text-white bg-grid-white/[0.05]">
           <div className="absolute pointer-events-none inset-0 flex items-center justify-center bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"></div>
           <div className="z-10 px-4 sm:px-6 lg:px-8 space-y-6">
-            <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-primary to-blue-400">
+            <h1 className="text-5xl md:text-7xl font-bold font-heading bg-clip-text text-transparent bg-gradient-to-b from-primary to-blue-400">
               Uncover the Truth
             </h1>
             <p className="text-lg md:text-xl max-w-3xl mx-auto text-muted-foreground">
@@ -26,7 +25,7 @@ export default function Home() {
         <section id="features" className="py-16 md:py-24 bg-background">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center space-y-4 mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold font-headline">A Toolkit for the Digital Age</h2>
+              <h2 className="text-3xl md:text-4xl font-bold font-heading">A Toolkit for the Digital Age</h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Equip yourself with the tools to discern fact from fiction. Veritas Vision offers a suite of analyzers to help you stay informed.
               </p>
@@ -63,7 +62,7 @@ export default function Home() {
 
         <section className="py-16 md:py-24 bg-secondary/20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold font-headline mb-6">Ready to See Clearly?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold font-heading mb-6">Ready to See Clearly?</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
               Start analyzing content today and arm yourself against the wave of digital deception.
             </p>
@@ -82,7 +81,7 @@ function FeatureCard({ icon, title, description, href }: { icon: React.ReactNode
     <Link href={href} className="block">
       <div className="bg-card p-6 rounded-lg h-full border border-transparent hover:border-primary transition-colors duration-300 transform hover:-translate-y-1">
         <div className="mb-4">{icon}</div>
-        <h3 className="text-xl font-bold font-headline mb-2">{title}</h3>
+        <h3 className="text-xl font-bold font-heading mb-2">{title}</h3>
         <p className="text-muted-foreground">{description}</p>
       </div>
     </Link>

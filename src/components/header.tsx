@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Newspaper, Film, AudioLines, Image as ImageIcon, ShieldCheck, Moon, Sun } from "lucide-react";
+import { ShieldCheck, Moon, Sun } from "lucide-react";
 import { useLanguage, languages } from "@/hooks/use-language";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { Logo } from "./logo";
 import { useState, useEffect } from "react";
 
 export function Header() {
