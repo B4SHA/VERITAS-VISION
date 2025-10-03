@@ -81,7 +81,14 @@ export async function newsSleuthAnalysis(
     let output: NewsSleuthOutput;
 
     try {
-        output = JSON.parse(responseText) as NewsSleuthOutput;
+        const jsonStart = responseText.indexOf('{');
+        const jsonEnd = responseText.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+            output = JSON.parse(jsonString) as NewsSleuthOutput;
+        } else {
+            throw new Error("No JSON object found in response.");
+        }
     } catch(e) {
         console.error("Failed to parse JSON from model response:", responseText);
         return {
