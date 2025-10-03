@@ -174,6 +174,8 @@ export function NewsSleuth() {
     </AccordionItem>
   );
 
+  const report = result;
+
   return (
     <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
       <div className="container mx-auto flex flex-col items-center gap-8 max-w-7xl">
@@ -322,7 +324,7 @@ export function NewsSleuth() {
                   <p className="text-center text-muted-foreground">{t('newsSleuth.analyzingText')}</p>
                 </div>
               )}
-              {!isLoading && !result && !errorResponse && (
+              {!isLoading && !report && !errorResponse && (
                 <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground p-8">
                   <Icons.barChart className="mx-auto mb-4 h-10 w-10" />
                   <p>{t('newsSleuth.pendingText')}</p>
@@ -338,7 +340,7 @@ export function NewsSleuth() {
                   </ScrollArea>
                 </div>
               )}
-              {result && (
+              {report && (
                  <ScrollArea className="h-full pr-4">
                   <div className="space-y-6">
 
@@ -346,25 +348,25 @@ export function NewsSleuth() {
                           <CardHeader>
                               <div className="flex justify-between items-center">
                                 <CardTitle className="text-lg">Overall Score</CardTitle>
-                                <Badge variant={getVerdictBadgeVariant(result.verdict)}>{result.verdict}</Badge>
+                                <Badge variant={getVerdictBadgeVariant(report.verdict)}>{report.verdict}</Badge>
                               </div>
                           </CardHeader>
                           <CardContent>
                               <div className="flex items-baseline gap-4">
-                                <span className="font-bold text-5xl text-primary">{result.overallScore}</span>
+                                <span className="font-bold text-5xl text-primary">{report.overallScore}</span>
                                 <span className="text-muted-foreground text-lg">/ 100</span>
                               </div>
-                              <Progress value={result.overallScore} indicatorClassName={getProgressIndicatorClassName(result.overallScore)} className="my-3"/>
-                              <p className="text-sm text-muted-foreground">{result.summary}</p>
+                              <Progress value={report.overallScore} indicatorClassName={getProgressIndicatorClassName(report.overallScore)} className="my-3"/>
+                              <p className="text-sm text-muted-foreground">{report.summary}</p>
                           </CardContent>
                       </Card>
 
                       <Accordion type="multiple" defaultValue={['reasoning', 'flagged-content']} className="w-full">
-                        <AnalysisItem title="Reasoning" content={result.reasoning} />
-                        <AnalysisItem title="Biases" content={result.biases} />
-                        <AnalysisItem title="Flagged Content" content={result.flaggedContent} />
+                        <AnalysisItem title="Reasoning" content={report.reasoning} />
+                        <AnalysisItem title="Biases" content={report.biases} />
+                        <AnalysisItem title="Flagged Content" content={report.flaggedContent} />
                         
-                        {result.sources && result.sources.length > 0 && (
+                        {report.sources && report.sources.length > 0 && (
                           <AccordionItem value="sources">
                              <AccordionTrigger>
                                 <div className="flex items-center justify-between w-full">
@@ -373,7 +375,7 @@ export function NewsSleuth() {
                               </AccordionTrigger>
                               <AccordionContent>
                                 <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                  {result.sources.map((source, i) => (
+                                  {report.sources.map((source, i) => (
                                     <li key={i}>
                                       <Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
                                         {source}

@@ -1,100 +1,105 @@
 
 'use server';
 /**
- * @fileOverview A news article credibility analysis AI agent.
+ * @fileOverview A news article credibility analysis AI agent using the direct Gemini API.
  *
- * This file defines the server-side logic for the News Sleleuth feature, which
- * analyzes news articles for credibility using a Genkit flow.
+ * This file defines the server-side logic for the News Sleuth feature, which
+ * analyzes news articles for credibility by calling the Gemini API directly.
  */
 
-import {ai} from '@/ai/genkit';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
-  NewsSleuthInputSchema,
-  NewsSleuthOutputSchema,
   type NewsSleuthInput,
   type NewsSleuthOutput,
   type NewsSleuthError,
 } from '@/ai/schemas';
-import { googleAI } from '@genkit-ai/google-genai';
 
-const newsSleuthPrompt = ai.definePrompt({
-  name: 'newsSleuthPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
-  tools: ['googleSearch'],
-  input: { schema: NewsSleuthInputSchema },
-  output: { schema: NewsSleuthOutputSchema },
-  prompt: `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('Missing GEMINI_API_KEY environment variable');
+}
 
-If an 'articleUrl' is provided, you MUST use your search tool to retrieve the article's content and corroborate facts before performing your analysis. If 'articleText' is provided, use that directly.
-
-{{#if articleUrl}}
-Article URL: {{articleUrl}}
-{{/if}}
-{{#if articleText}}
-Article Text:
----
-{{articleText}}
----
-{{/if}}
-{{#if articleHeadline}}
-Article Headline: {{articleHeadline}}
-{{/if}}
-
-Your JSON output must include these fields:
-- overallScore: A credibility score from 0-100.
-- verdict: Your final judgment ('Likely Real', 'Likely Fake', 'Uncertain').
-- summary: A brief summary of the article's main points.
-- biases: An analysis of any detected biases (e.g., political, commercial).
-- flaggedContent: A list of specific issues found (e.g., sensationalism, logical fallacies).
-- reasoning: The reasoning behind the overall verdict and score.
-- sources: A list of URLs you used from your search tool to corroborate facts. This MUST be populated from your search results.
-`,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro-latest' });
 
 
-const newsSleuthFlow = ai.defineFlow(
-  {
-    name: 'newsSleuthFlow',
-    inputSchema: NewsSleuthInputSchema,
-    outputSchema: NewsSleuthOutputSchema,
-  },
-  async (input) => {
-    const { output } = await newsSleuthPrompt(input);
-
-    if (!output) {
-      throw new Error('The AI model did not produce any output.');
-    }
-    
-    return output;
-  }
-);
-
+const NewsSleuthOutputJsonSchema = {
+    "type": "object",
+    "properties": {
+        "overallScore": {
+            "type": "number",
+            "description": "A credibility score from 0 to 100."
+        },
+        "verdict": {
+            "type": "string",
+            "enum": ['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis'],
+            "description": "The final judgment on the article's credibility."
+        },
+        "summary": {
+            "type": "string",
+            "description": "A brief summary of the article's main points."
+        },
+        "biases": {
+            "type": "string",
+            "description": "An analysis of any detected biases (e.g., political, commercial)."
+        },
+        "flaggedContent": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims."
+        },
+        "reasoning": {
+            "type": "string",
+            "description": "The reasoning behind the overall verdict and score."
+        }
+    },
+    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
+};
 
 export async function newsSleuthAnalysis(
   input: NewsSleuthInput
 ): Promise<NewsSleuthOutput | NewsSleuthError> {
+  let articleInfo = '';
+  if (input.articleText) articleInfo += `Full Text: ${input.articleText}\n`;
+  if (input.articleHeadline) articleInfo += `Headline: ${input.articleHeadline}\n`;
+  if (input.articleUrl) articleInfo += `URL: ${input.articleUrl}\n`;
+
+  const prompt = `
+    You are a world-class investigative journalist and fact-checker AI.
+    Task:
+    1. Analyze the provided articleInfo for credibility. If a URL is provided, you MUST fetch its content.
+    2. Use googleSearch to find corroborating/contradictory sources in ${input.language}.
+    3. Identify biases, flag misleading claims, and score credibility (0-100).
+    4. Output in ${input.language} as a JSON object matching the provided schema.
+
+    Article Info: ${articleInfo}
+  `;
+
   try {
-    const result = await newsSleuthFlow(input);
-    return result;
-  } catch (error: any) {
-    console.error("Error in newsSleuthAnalysis flow:", error);
-    // Attempt to parse Genkit's structured error
-    const match = error.message.match(/An error occurred during generation: (\{.*\})/);
-    if (match && match[1]) {
-        try {
-            const parsedError = JSON.parse(match[1]);
-            return {
-                error: 'FLOW_EXECUTION_FAILED',
-                details: parsedError.message || "The AI model returned a structured error.",
-            };
-        } catch (e) {
-            // Fallback if parsing fails
-        }
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: NewsSleuthOutputJsonSchema as any,
+      },
+    });
+
+    const response = result.response;
+    if (!response.text()) {
+        throw new Error("The AI model returned an empty response.");
     }
-    
-    // Fallback for generic errors
+    const output = JSON.parse(response.text());
+
+    // Extract sources from grounding metadata
+    const metadata = response.candidates?.[0]?.groundingMetadata;
+    const searchResults = metadata?.groundingAttributions || [];
+    const sources = searchResults.map(attribution => attribution.web?.uri || '').filter(uri => !!uri);
+
+    return { ...output, sources: sources };
+  } catch (error: any) {
+    console.error('API Error:', error);
     return {
-      error: 'FLOW_EXECUTION_FAILED',
+      error: 'API_EXECUTION_FAILED',
       details: error.message || 'The AI model failed to generate a response.',
     };
   }
