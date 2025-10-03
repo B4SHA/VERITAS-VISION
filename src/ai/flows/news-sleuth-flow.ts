@@ -50,9 +50,14 @@ const NewsSleuthOutputJsonSchema = {
         "reasoning": {
             "type": "string",
             "description": "The reasoning behind the overall verdict and score."
+        },
+        "sources": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "A list of URLs used to corroborate facts. This MUST be populated from the search results."
         }
     },
-    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
+    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
 };
 
 export async function newsSleuthAnalysis(
@@ -70,7 +75,7 @@ export async function newsSleuthAnalysis(
     1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
     2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
     3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    4.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
+    4.  You MUST populate the "sources" field in the JSON output with the URLs of the web pages you consulted during your search.
     5.  You MUST output your final report in ${input.language}.
     6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
@@ -105,16 +110,8 @@ export async function newsSleuthAnalysis(
         console.error("Failed to parse JSON from model response:", responseText);
         throw new Error("The AI model returned an invalid JSON format. Please try again.");
     }
-
-    const toolCalls = response.functionCalls();
-    let sources: string[] = [];
-    if (toolCalls) {
-      sources = toolCalls.flatMap(toolCall => 
-          toolCall.args.results?.map((res: any) => res.uri) || []
-      ).filter((uri: string | undefined): uri is string => !!uri);
-    }
     
-    return { ...output, sources: sources };
+    return output;
   } catch (error: any) {
     console.error('API Error:', error);
     return {
