@@ -2,6 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useMemo } from 'react';
+import { translations as allTranslations } from '@/data/translations';
 
 export type Language = 'en' | 'hi' | 'bn' | 'mr' | 'te' | 'ta';
 
@@ -14,40 +15,25 @@ export const languages: { value: Language; label: string }[] = [
   { value: 'ta', label: 'Tamil' },
 ];
 
-const translations: Record<string, Record<Language, string>> = {
-  "News": {
-    "en": "News",
-    "hi": "समाचार",
-    "bn": "খবর",
-    "mr": "बातम्या",
-    "te": "వార్తలు",
-    "ta": "செய்திகள்"
-  },
-  "Video": {
-    "en": "Video",
-    "hi": "वीडियो",
-    "bn": "ভিডিও",
-    "mr": "व्हिडिओ",
-    "te": "వీడియో",
-    "ta": "காணொளி"
-  },
-  "Audio": {
-    "en": "Audio",
-    "hi": "ऑडियो",
-    "bn": "অডিও",
-    "mr": "ऑडिओ",
-    "te": "ఆడియో",
-    "ta": "ஆடியோ"
-  },
-  "Image": {
-    "en": "Image",
-    "hi": "छवि",
-    "bn": "ছবি",
-    "mr": "प्रतिमा",
-    "te": "చిత్రం",
-    "ta": "படம்"
-  },
-};
+function getTranslatedValue(language: string, key: string) {
+    const keyParts = key.split('.');
+    let currentObject: any = allTranslations;
+
+    for (const part of keyParts) {
+        if (currentObject[part] === undefined) {
+            return key; // Key not found
+        }
+        currentObject = currentObject[part];
+    }
+
+    if (currentObject[language] === undefined) {
+        // Fallback to English if the specific language is not available
+        return currentObject['en'] || key;
+    }
+
+    return currentObject[language];
+}
+
 
 interface LanguageContextType {
   language: Language;
@@ -61,7 +47,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
 
   const t = useMemo(() => (key: string): string => {
-    return translations[key]?.[language] || key;
+    return getTranslatedValue(language, key);
   }, [language]);
 
   const value = { language, setLanguage, t };
