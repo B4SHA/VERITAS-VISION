@@ -41,7 +41,7 @@ const NewsSleuthOutputSchema = z.object({
     biases: z.array(z.string()).describe('A list of identified biases (e.g., "Confirmation Bias", "Sensationalism").'),
     flaggedContent: z.array(z.string()).describe('Specific phrases or claims that are flagged as potentially misleading or false.'),
     reasoning: z.string().describe('A detailed explanation of how the score and verdict were determined.'),
-    sources: z-array(z.string()).describe('A list of URLs for sources consulted during the analysis.'),
+    sources: z.array(z.string()).describe('A list of URLs for sources consulted during the analysis.'),
   }),
 });
 
