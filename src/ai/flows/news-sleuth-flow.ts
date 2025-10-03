@@ -58,7 +58,7 @@ ${articleInfo}
 `;
 
     const llmResponse = await ai.generate({
-      model: 'gemini-2.5-flash',
+      model: 'googleai/gemini-2.5-flash',
       prompt: prompt,
       output: {
         schema: NewsSleuthOutputSchema,

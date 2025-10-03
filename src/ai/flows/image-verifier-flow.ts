@@ -55,7 +55,7 @@ The output language for the report and analysis must be in the language specifie
 Image for analysis is provided in the content.`;
 
     const llmResponse = await ai.generate({
-      model: 'gemini-2.5-flash',
+      model: 'googleai/gemini-2.5-flash',
       prompt: [
         {
           media: {
