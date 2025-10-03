@@ -85,6 +85,8 @@ ${articleInfo}
 
   const responseText = await callSonarWithSearch(prompt);
 
+  console.log("Raw response from Sonar model:", responseText);
+
   const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
   const jsonText = jsonMatch ? jsonMatch[1] : responseText;
   
