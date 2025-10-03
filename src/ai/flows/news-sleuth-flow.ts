@@ -1,6 +1,7 @@
 
 'use server';
 
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { cleanJsonSchema } from "@/lib/utils";
@@ -27,30 +28,37 @@ const NewsSleuthOutputSchema = z.object({
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-async function callSonarWithSearch(prompt: string): Promise<string> {
-  const apiKey = process.env.PPLX_API_KEY;
-  if (!apiKey) {
-    throw new Error("PPLX_API_KEY is not set in the environment variables.");
-  }
-  const response = await fetch("https://api.perplexity.ai/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+
+const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-pro",
+    generationConfig: {
+        response_mime_type: "application/json",
+        // @ts-ignore
+        response_schema: cleanJsonSchema(jsonSchema),
     },
-    body: JSON.stringify({
-      model: "sonar-large-reasoning-online",
-      messages: [{ role: "user", content: prompt }],
-      stream: false
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`Perplexity API error: ${response.status} ${await response.text()}`);
-  }
-  const data = await response.json();
-  console.log("Raw Perplexity API response:", JSON.stringify(data, null, 2));
-  return data.choices?.[0]?.message?.content ?? '';
-}
+    safetySettings: [
+        {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+    ],
+    // @ts-ignore
+    tools: [{ "google_search": {} }],
+});
 
 export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
   let articleInfo = '';
@@ -61,22 +69,15 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `Headline: "${input.articleHeadline}"\n`;
   }
   if (input.articleUrl) {
-    // This is the critical part for URL analysis
-    articleInfo += `**You MUST fetch and analyze the content from this primary URL**: ${input.articleUrl}\n\n`;
+    articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
   }
-
-  const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
   
-  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL, analyze it, and then generate a credibility report in JSON format.
+  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report in JSON format. You have access to Google Search to find real-time information and access URLs.
 
 **Instructions:**
-1.  **FETCH CONTENT**: Access the URL provided below in the "Article Information for Analysis" section. You MUST read the full content of this article. Your entire analysis depends on this step.
+1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
 2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
-3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the following schema. Do not include any other text, conversation, or markdown formatting.
-
-\`\`\`json
-${JSON.stringify(cleanJsonSchema(jsonSchema))}
-\`\`\`
+3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the schema provided in the generation configuration. Do not include any other text, conversation, or markdown formatting.
 
 The output language must be: **${input.language}**.
 
@@ -84,17 +85,10 @@ The output language must be: **${input.language}**.
 ${articleInfo}
 `;
 
-  const responseText = await callSonarWithSearch(prompt);
-  console.log("Raw response from Sonar model:", responseText);
+  const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  });
 
-  // More robust JSON extraction
-  const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-  const jsonText = jsonMatch ? jsonMatch[1] : responseText;
-
-  try {
-    return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
-  } catch (e) {
-    console.error("Failed to parse JSON response from model:", jsonText);
-    throw new Error("Invalid response from Sonar model. Please try again.");
-  }
+  const responseText = result.response.text();
+  return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
 }
