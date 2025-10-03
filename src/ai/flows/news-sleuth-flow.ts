@@ -31,7 +31,7 @@ export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const fetchUrlTool = {
-    "function_declarations": [
+    "functionDeclarations": [
         {
             "name": "fetchUrl",
             "description": "Fetches the text content of a publicly accessible web page URL.",
@@ -66,6 +66,7 @@ const model = genAI.getGenerativeModel({
             threshold: HarmBlockThreshold.BLOCK_NONE,
         },
     ],
+    tools: [fetchUrlTool, { "googleSearch": {} }],
 });
 
 async function fetchUrl(url: string): Promise<any> {
@@ -120,13 +121,13 @@ ${articleInfo}
 `;
     
     const chat = model.startChat({
-        tools: [fetchUrlTool, { "google_search": {} }],
+        tools: [fetchUrlTool, { "googleSearch": {} }],
     });
 
     const result = await chat.sendMessage(prompt);
     let response = result.response;
 
-    if (response.functionCalls() && response.functionCalls().length > 0) {
+    if (response.functionCalls && response.functionCalls().length > 0) {
         const functionCalls = response.functionCalls();
         const functionResponses = [];
 
@@ -144,7 +145,7 @@ ${articleInfo}
         }
         
         if (functionResponses.length > 0) {
-            const result2 = await chat.sendMessage(functionResponses);
+            const result2 = await chat.sendMessage(JSON.stringify(functionResponses));
             response = result2.response;
         }
     }
