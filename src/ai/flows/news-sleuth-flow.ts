@@ -3,6 +3,7 @@
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -45,10 +46,11 @@ const fetchUrlTool = {
 };
 
 const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
     generationConfig: {
         response_mime_type: "application/json",
-        response_schema: NewsSleuthOutputSchema,
+        // @ts-ignore
+        response_schema: zodToJsonSchema(NewsSleuthOutputSchema),
     },
     safetySettings: [
         {
@@ -76,6 +78,7 @@ async function fetchUrl(url: string): Promise<string> {
     try {
         const response = await fetch(url);
         const text = await response.text();
+        // This is a simplified representation. A real implementation would parse the main content.
         return `(Simulated Scrape) Content from ${url}. First 200 chars: ${text.substring(0, 200)}...`;
     } catch (e) {
         console.error('Fetch failed:', e);
