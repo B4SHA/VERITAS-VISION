@@ -65,30 +65,42 @@ export async function newsSleuthAnalysis(
 
   const prompt = `
     You are a world-class investigative journalist and fact-checker AI.
-    Task:
-    1. Analyze the provided articleInfo for credibility. If a URL is provided, you MUST fetch its content.
-    2. Use googleSearch to find corroborating/contradictory sources in ${input.language}.
-    3. Identify biases, flag misleading claims, and score credibility (0-100).
-    4. Output in ${input.language} as a JSON object matching the provided schema.
+    Your task is to analyze the provided article information for credibility and generate a report.
+    
+    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
+    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
+    3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    4.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
+    5.  You MUST output your final report in ${input.language}.
+    6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    
+    JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
 
-    Article Info: ${articleInfo}
+    Article Info:
+    ${articleInfo}
   `;
 
   try {
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       tools: [{ googleSearch: {} }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: NewsSleuthOutputJsonSchema as any,
-      },
     });
 
     const response = result.response;
-    if (!response.text()) {
+    const responseText = response.text();
+
+    if (!responseText) {
         throw new Error("The AI model returned an empty response.");
     }
-    const output = JSON.parse(response.text());
+
+    let output: NewsSleuthOutput;
+    try {
+        output = JSON.parse(responseText);
+    } catch(e) {
+        console.error("Failed to parse JSON from model response:", responseText);
+        throw new Error("The AI model returned an invalid JSON format. Please try again.");
+    }
+
 
     // Extract sources from grounding metadata
     const metadata = response.candidates?.[0]?.groundingMetadata;
