@@ -118,15 +118,17 @@ export function NewsSleuth() {
     
     try {
       const analysisResult = await newsSleuthAnalysis(analysisInput);
-      if ('error' in analysisResult) {
+      if (analysisResult && 'error' in analysisResult) {
         setErrorResponse(analysisResult);
         toast({
             variant: "destructive",
             title: "Analysis Failed",
             description: analysisResult.details || "The AI model failed to generate a response.",
         });
-      } else {
+      } else if (analysisResult) {
         setResult(analysisResult);
+      } else {
+        setErrorResponse({error: "NO_RESPONSE", details: "An unexpected response was received from the server."});
       }
     } catch (error) {
       console.error(error);
@@ -149,6 +151,7 @@ export function NewsSleuth() {
   };
   
   const getVerdictBadgeVariant = (verdict: string) => {
+    if (!verdict) return 'secondary';
     const lowerVerdict = verdict.toLowerCase();
     if (lowerVerdict.includes('real')) return 'default';
     if (lowerVerdict.includes('fake')) return 'destructive';

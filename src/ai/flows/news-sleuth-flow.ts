@@ -79,19 +79,6 @@ export async function newsSleuthAnalysis(
         };
     }
     
-    // Fallback source extraction from tool calls if not in the main response
-    if ((!output.sources || output.sources.length === 0) && response.functionCalls()) {
-        const sources: string[] = [];
-        for (const funcCall of response.functionCalls()) {
-            if (funcCall.name === 'googleSearch') {
-                const searchResults = funcCall.args.query; // This is a simplification
-                // A more robust implementation would parse the actual tool output if available.
-                // For now, we assume this is a placeholder for where source extraction would go.
-            }
-        }
-        output.sources = sources;
-    }
-
     return output;
 
   } catch (error: any) {
