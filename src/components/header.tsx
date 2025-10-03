@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -21,7 +22,7 @@ import { useTranslation } from '@/hooks/use-translation';
 export function Header() {
   const pathname = usePathname();
   const { setLanguage } = useLanguage();
-  const { navigationLinks } = useTranslation();
+  const { t, navigationLinks } = useTranslation();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -94,7 +95,7 @@ export function Header() {
                 <Link href="/" className="flex items-center space-x-2 mb-6">
                   <Icons.shield className="h-8 w-8 text-primary" />
                   <span className="text-xl font-bold tracking-tight text-foreground">
-                    Misinformation Mitigator
+                    Veritas Vision
                   </span>
                 </Link>
                 <div className="grid gap-4 py-2">
