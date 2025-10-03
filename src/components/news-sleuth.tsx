@@ -93,7 +93,7 @@ export function NewsSleuth() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      inputType: "text",
+      inputType: "url",
       articleText: "",
       articleUrl: "",
       articleHeadline: "",
@@ -216,15 +216,15 @@ export function NewsSleuth() {
                           >
                             <FormItem className="flex items-center space-x-2 space-y-0">
                               <FormControl>
-                                <RadioGroupItem value="text" id="text" />
-                              </FormControl>
-                              <FormLabel htmlFor="text" className="font-normal cursor-pointer">{t('newsSleuth.inputTextLabel')}</FormLabel>
-                            </FormItem>
-                             <FormItem className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
                                 <RadioGroupItem value="url" id="url" />
                               </FormControl>
                               <FormLabel htmlFor="url" className="font-normal cursor-pointer">{t('newsSleuth.inputUrlLabel')}</FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="text" id="text" />
+                              </FormControl>
+                              <FormLabel htmlFor="text" className="font-normal cursor-pointer">{t('newsSleuth.inputTextLabel')}</FormLabel>
                             </FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0">
                               <FormControl>

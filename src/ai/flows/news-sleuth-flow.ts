@@ -16,7 +16,6 @@ import {
   type NewsSleuthError,
 } from '@/ai/schemas';
 import { googleAI } from '@genkit-ai/google-genai';
-import { fetchWebContent } from '@/ai/tools/web-scraper';
 
 const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
@@ -25,7 +24,7 @@ const prompt = ai.definePrompt({
     output: { schema: NewsSleuthOutputSchema },
     prompt: `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
 
-If an 'articleUrl' is provided, you MUST use the 'fetchWebContent' tool to retrieve the article's text before performing your analysis. If 'articleText' is provided, use that directly.
+If an 'articleUrl' is provided, you MUST use your search tool to retrieve the article's content and corroborate facts before performing your analysis. If 'articleText' is provided, use that directly.
 
 {{#if articleUrl}}
 Article URL: {{articleUrl}}
@@ -47,7 +46,7 @@ Your JSON output must include these fields:
 - biases: An analysis of any detected biases (e.g., political, commercial).
 - flaggedContent: A list of specific issues found (e.g., sensationalism, logical fallacies).
 - reasoning: The reasoning behind the overall verdict and score.
-- sources: A list of URLs used to corroborate facts. This MUST be populated from your internal knowledge and analysis.
+- sources: A list of URLs you used from your search tool to corroborate facts. This MUST be populated from your search results.
 `,
 });
 
@@ -57,7 +56,7 @@ const newsSleuthFlow = ai.defineFlow(
     name: 'newsSleuthFlow',
     inputSchema: NewsSleuthInputSchema,
     outputSchema: NewsSleuthOutputSchema,
-    tools: [fetchWebContent],
+    tools: [{tool: 'googleSearch'}],
   },
   async (input) => {
     const { output } = await prompt(input);
@@ -74,9 +73,24 @@ export async function newsSleuthAnalysis(
     return result;
   } catch (error: any) {
     console.error("Error in newsSleuthAnalysis flow:", error);
+    // Attempt to parse Genkit's structured error
+    const match = error.message.match(/An error occurred during generation: (\{.*\})/);
+    if (match && match[1]) {
+        try {
+            const parsedError = JSON.parse(match[1]);
+            return {
+                error: 'FLOW_EXECUTION_FAILED',
+                details: parsedError.message || "The AI model returned a structured error.",
+            };
+        } catch (e) {
+            // Fallback if parsing fails
+        }
+    }
+    
+    // Fallback for generic errors
     return {
       error: 'FLOW_EXECUTION_FAILED',
-      details: error.message || 'The AI model failed to execute.',
+      details: error.message || 'The AI model failed to generate a response.',
     };
   }
 }
