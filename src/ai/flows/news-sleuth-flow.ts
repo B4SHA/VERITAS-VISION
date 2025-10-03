@@ -40,7 +40,7 @@ async function callSonarWithSearch(prompt: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "sonar-large-reasoning-online",
+      model: "sonar-reasoning",
       messages: [{ role: "user", content: prompt }],
     }),
   });
