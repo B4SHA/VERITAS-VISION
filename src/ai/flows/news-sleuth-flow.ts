@@ -11,6 +11,9 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
   model: 'gemini-2.5-flash',
+  generationConfig: {
+    responseMimeType: 'application/json',
+  },
 });
 
 const NewsSleuthInputSchema = z.object({
@@ -20,47 +23,14 @@ const NewsSleuthInputSchema = z.object({
   language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
 });
 
-const PublicationDetailsSchema = z.object({
-  name: z.string(),
-  url: z.string().url(),
-  publication_type: z.string(),
-  reputation: z.string(),
-});
-
-const ArticleDetailsSchema = z.object({
-  title: z.string(),
-  url: z.string().url(),
-  author: z.string(),
-  publication_date: z.string(),
-  main_claim: z.string(),
-  keywords: z.array(z.string()),
-});
-
-const AnalysisDetailSchema = z.object({
-  assessment: z.string(),
-  supporting_points: z.array(z.string()),
-});
-
-const AnalysisSchema = z.object({
-  factual_accuracy: AnalysisDetailSchema,
-  source_reliability: AnalysisDetailSchema,
-  bias_manipulation: AnalysisDetailSchema,
-  author_expertise: AnalysisDetailSchema,
-});
-
-const OverallCredibilityScoreSchema = z.object({
-  score: z.number(),
-  scale: z.string(),
-  reasoning: z.string(),
-});
-
 const NewsSleuthOutputSchema = z.object({
-  report_title: z.string(),
-  publication_details: PublicationDetailsSchema,
-  article_details: ArticleDetailsSchema,
-  analysis: AnalysisSchema,
-  overall_credibility_score: OverallCredibilityScoreSchema,
-  recommendations: z.array(z.string()),
+  overallScore: z.number().describe('A credibility score from 0-100.'),
+  verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final judgment on the article\'s credibility.'),
+  summary: z.string().describe('A brief summary of the article\'s main points.'),
+  biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
+  flaggedContent: z.string().describe('Description of any sensationalism, logical fallacies, or other flagged content.'),
+  reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
+  sources: z.array(z.string()).describe('A list of URLs used to corroborate facts.'),
 });
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
@@ -76,54 +46,55 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `Headline: "${input.articleHeadline}"\n`;
   }
   if (input.articleUrl) {
-    articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
+    articleInfo += `You MUST fetch and analyze the content from this primary URL: ${input.articleUrl}\n\n`;
   }
 
-  const prompt = `You are an expert investigative journalist AI. Your primary task is to analyze the provided article content and generate a credibility report.
+  const prompt = `You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories. Analyze the provided article information and generate a credibility report in ${input.language}.
 
-**Instructions:**
-1.  **ANALYZE**: Based on the provided content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language (sensationalism, logical fallacies).
-2.  **GENERATE JSON REPORT**: The output language must be: **${input.language}**.
+Your JSON output must include these fields:
+- overallScore: A credibility score from 0-100.
+- verdict: Your final judgment ('Likely Real', 'Likely Fake', or 'Uncertain').
+- summary: A brief summary of the article.
+- biases: Analysis of any detected political, commercial, or other biases.
+- flaggedContent: Description of any sensationalism, logical fallacies, or other flagged content.
+- reasoning: The reasoning behind your overall verdict and score.
+- sources: An array of URLs you used from your search grounding to verify the information.
 
 Article Information for Analysis:
-${articleInfo}
+${articleInfo}`;
 
-Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
-
-    const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{text: prompt}] }],
-    });
-
+  try {
+    const result = await model.generateContent(prompt);
     const response = result.response;
-    let text = response.text();
-
+    const text = response.text();
+    
+    // First, try to parse directly
     try {
-        // First, try to parse directly
-        try {
-          const parsed = JSON.parse(text);
-          return NewsSleuthOutputSchema.parse(parsed);
-        } catch (e) {
-          // If direct parse fails, try to extract from markdown
-          const match = text.match(/```json\n([\s\S]*?)\n```/);
-          if (match && match[1]) {
-            const parsed = JSON.parse(match[1]);
-            return NewsSleuthOutputSchema.parse(parsed);
-          }
-  
-          // If markdown extraction fails, try to find the JSON object manually
-          const startIndex = text.indexOf('{');
-          const endIndex = text.lastIndexOf('}');
-          if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-            const jsonString = text.substring(startIndex, endIndex + 1);
-            const parsed = JSON.parse(jsonString);
-            return NewsSleuthOutputSchema.parse(parsed);
-          }
-          
-          // If all else fails, throw the original error
-          throw new Error("Failed to find a valid JSON object in the response.");
-        }
+      const parsed = JSON.parse(text);
+      return NewsSleuthOutputSchema.parse(parsed);
     } catch (e) {
-        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-        return { error: 'PARSING_FAILED', rawResponse: text };
+      // If direct parse fails, try to extract from markdown
+      const match = text.match(/```json\n([\s\S]*?)\n```/);
+      if (match && match[1]) {
+        const parsed = JSON.parse(match[1]);
+        return NewsSleuthOutputSchema.parse(parsed);
+      }
+
+      // If markdown extraction fails, try to find the JSON object manually
+      const startIndex = text.indexOf('{');
+      const endIndex = text.lastIndexOf('}');
+      if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+        const jsonString = text.substring(startIndex, endIndex + 1);
+        const parsed = JSON.parse(jsonString);
+        return NewsSleuthOutputSchema.parse(parsed);
+      }
+      
+      // If all else fails, return the error object
+      console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+      return { error: 'PARSING_FAILED', rawResponse: text };
     }
+  } catch (error) {
+    console.error("Error during AI generation:", error);
+    return { error: 'GENERATION_FAILED', rawResponse: 'The AI model failed to generate a response.' };
+  }
 }

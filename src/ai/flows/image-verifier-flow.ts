@@ -12,8 +12,10 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
   model: 'gemini-2.5-flash',
+  generationConfig: {
+    responseMimeType: 'application/json',
+  },
 });
-
 
 const ImageVerifierInputSchema = z.object({
   imageDataUri: z
@@ -26,8 +28,9 @@ const ImageVerifierInputSchema = z.object({
 
 const ImageVerifierOutputSchema = z.object({
     verdict: z.enum(['Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain']).describe("The final judgment on the image's authenticity."),
-    confidenceScore: z.number().describe("A score from 0-100 indicating the confidence in the verdict."),
-    report: z.string().describe("A detailed forensic report explaining the analysis, including details about artifacts, inconsistencies, web search findings, or other findings."),
+    overallScore: z.number().describe("A score from 0-100 indicating the confidence in the verdict."),
+    summary: z.string().describe("A brief summary of the findings."),
+    reasoning: z.string().describe("A detailed forensic report explaining the analysis, including details about artifacts, inconsistencies, etc."),
     detectedText: z.string().optional().describe("Text detected within the image."),
 });
 
@@ -35,58 +38,59 @@ export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 export type ImageVerifierError = { error: string; rawResponse: string };
 
-
 export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput | ImageVerifierError> {
   const imagePart = dataUriToGenerativePart(input.imageDataUri);
 
-  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context.
+  const prompt = `You are an expert digital image forensics analyst. Analyze the provided image and generate an authenticity report in ${input.language}.
 
-You will perform the following analysis:
-1.  **Forensic Analysis**: Analyze the image for artifacts characteristic of AI image synthesis (GANs, diffusion models), manipulation (e.g., cloning, splicing), and inconsistencies in shadows, reflections, or perspectives.
-2.  **Contextual Analysis**: Determine the likely origin and context of the image based on visual cues.
-3.  **Text Analysis (OCR)**: If there is text in the image, extract it and include it in the 'detectedText' field.
-4.  **Verdict, Confidence, and Report**: Provide a final verdict ('Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain'), a confidence score (0-100), and a comprehensive report detailing your findings from all analysis steps.
-
-The output language for the report and analysis must be in the language specified by the user: ${input.language}.
-
-Image for analysis is provided in the content.
-
-Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
-
-  const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-  });
-
-  const response = result.response;
-  let text = response.text();
+Your JSON output must include these fields:
+- overallScore: A confidence score (0-100) in your verdict.
+- verdict: Your final judgment ('Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain').
+- summary: A brief summary of your findings.
+- reasoning: Detailed reasoning for your verdict, analyzing artifacts, inconsistencies in shadows/reflections, and other forensic details.
+- detectedText: If there is text in the image, extract it here. If not, this should be null.
+`;
 
   try {
-      // First, try to parse directly
-      try {
-        const parsed = JSON.parse(text);
-        return ImageVerifierOutputSchema.parse(parsed);
-      } catch (e) {
-        // If direct parse fails, try to extract from markdown
-        const match = text.match(/```json\n([\s\S]*?)\n```/);
-        if (match && match[1]) {
-          const parsed = JSON.parse(match[1]);
-          return ImageVerifierOutputSchema.parse(parsed);
-        }
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
+    });
 
-        // If markdown extraction fails, try to find the JSON object manually
-        const startIndex = text.indexOf('{');
-        const endIndex = text.lastIndexOf('}');
-        if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-          const jsonString = text.substring(startIndex, endIndex + 1);
-          const parsed = JSON.parse(jsonString);
+    const response = result.response;
+    let text = response.text();
+
+    try {
+        // First, try to parse directly
+        try {
+          const parsed = JSON.parse(text);
           return ImageVerifierOutputSchema.parse(parsed);
+        } catch (e) {
+          // If direct parse fails, try to extract from markdown
+          const match = text.match(/```json\n([\s\S]*?)\n```/);
+          if (match && match[1]) {
+            const parsed = JSON.parse(match[1]);
+            return ImageVerifierOutputSchema.parse(parsed);
+          }
+
+          // If markdown extraction fails, try to find the JSON object manually
+          const startIndex = text.indexOf('{');
+          const endIndex = text.lastIndexOf('}');
+          if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+            const jsonString = text.substring(startIndex, endIndex + 1);
+            const parsed = JSON.parse(jsonString);
+            return ImageVerifierOutputSchema.parse(parsed);
+          }
+          
+          // If all else fails, return the error object
+          console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+          return { error: 'PARSING_FAILED', rawResponse: text };
         }
-        
-        // If all else fails, throw the original error
-        throw new Error("Failed to find a valid JSON object in the response.");
-      }
-  } catch (e) {
-      console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-      return { error: 'PARSING_FAILED', rawResponse: text };
+    } catch (e) {
+        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+        return { error: 'PARSING_FAILED', rawResponse: text };
+    }
+  } catch (error) {
+    console.error("Error during AI generation:", error);
+    return { error: 'GENERATION_FAILED', rawResponse: 'The AI model failed to generate a response.' };
   }
 }

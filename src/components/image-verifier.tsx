@@ -96,13 +96,6 @@ export function ImageVerifier() {
     return 'secondary';
   };
 
-  const getVerdictIcon = (verdict: string) => {
-    const lowerVerdict = verdict.toLowerCase();
-    if (lowerVerdict.includes('authentic')) return <Icons.check className="mr-1.5" />;
-    if (lowerVerdict.includes('ai-generated') || lowerVerdict.includes('manipulated')) return <Icons.alert className="mr-1.5" />;
-    return <Icons.help className="mr-1.5" />;
-  };
-
   return (
      <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
       <div className="container mx-auto flex flex-col items-center gap-8 max-w-5xl">
@@ -205,17 +198,22 @@ export function ImageVerifier() {
                           <div className="flex items-center justify-between">
                               <h3 className="font-semibold text-lg">Image Verdict</h3>
                               <Badge variant={getVerdictBadgeVariant(result.verdict)} className="px-3 py-1 text-sm">
-                              {getVerdictIcon(result.verdict)}
                               {result.verdict}
                               </Badge>
                           </div>
                           <div className="flex items-center justify-between">
                               <h3 className="font-semibold text-lg">Confidence Score</h3>
-                              <span className="font-bold text-2xl text-primary">{result.confidenceScore}/100-</span>
+                              <span className="font-bold text-2xl text-primary">{result.overallScore}/100</span>
                           </div>
-                          <Progress value={result.confidenceScore} indicatorClassName={getProgressIndicatorClassName(result.confidenceScore)} />
+                          <Progress value={result.overallScore} indicatorClassName={getProgressIndicatorClassName(result.overallScore)} />
                         </div>
                         <Separator />
+                        
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-lg px-1">Summary</h3>
+                          <p className="text-sm text-foreground/80">{result.summary}</p>
+                        </div>
+                        <Separator/>
                                                 
                         {result.detectedText && (
                             <>
@@ -234,7 +232,7 @@ export function ImageVerifier() {
                         <div>
                             <h3 className="font-semibold text-lg mb-2">Image Forensics Report</h3>
                             <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
-                                {result.report}
+                                {result.reasoning}
                             </p>
                         </div>
                     </div>

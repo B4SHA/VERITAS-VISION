@@ -19,8 +19,8 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
-import { cn } from "@/lib/utils";
-
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "./ui/badge";
 
 const formSchema = z.object({
   videoFile: z
@@ -83,14 +83,38 @@ export function VideoIntegrity() {
     }
   }
 
-  const analysisItems = result ? [
-    { label: "Deepfake", detected: result.analysis.deepfake },
-    { label: "Video Manipulation", detected: result.analysis.videoManipulation },
-    { label: "Synthetic Voice", detected: result.analysis.syntheticVoice },
-    { label: "Fully AI-Generated", detected: result.analysis.fullyAIGenerated },
-    { label: "Satire or Parody", detected: result.analysis.satireOrParody },
-    { label: "Misleading Context", detected: result.analysis.misleadingContext },
-  ] : [];
+  const getVerdictBadgeVariant = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('authentic')) return 'default';
+    if (lowerVerdict.includes('manipulation')) return 'destructive';
+    return 'secondary';
+  };
+  
+  const getProgressIndicatorClassName = (score: number) => {
+    if (score < 40) return "bg-destructive";
+    if (score < 70) return "bg-accent";
+    return "bg-primary";
+  };
+
+  const AnalysisItem = ({ title, content }: { title: string, content: string }) => {
+    const isDetected = content.toLowerCase().startsWith('detected');
+    return (
+       <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
+        <AccordionTrigger>
+          <div className="flex items-center justify-between w-full">
+            <span>{title}</span>
+            <div className={`flex items-center gap-2 text-sm ${isDetected ? 'text-destructive' : 'text-primary'}`}>
+                {isDetected ? <Icons.alert className="h-4 w-4" /> : <Icons.checkCircle className="h-4 w-4" />}
+                <span>{isDetected ? 'Detected' : 'Not Detected'}</span>
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent>
+           <p className="text-sm text-muted-foreground">{content.substring(content.indexOf(' ') + 1)}</p>
+        </AccordionContent>
+      </AccordionItem>
+    );
+  }
 
   return (
     <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
@@ -183,52 +207,49 @@ export function VideoIntegrity() {
                           </div>
                         )}
                         {result && (
-                          <div className="flex-1 flex flex-col min-h-0">
-                            <div className="px-1 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-semibold text-lg">Analysis Confidence</h3>
-                                    <span className="font-bold text-2xl text-primary">{result.analysisConfidence.toFixed(0)}%</span>
-                                </div>
-                                <Progress value={result.analysisConfidence} />
-                            </div>
-                            <Separator className="my-4" />
-                            <ScrollArea className="flex-1 -mr-4 pr-4">
-                                <div className="space-y-3">
-                                  {analysisItems.map((item) => (
-                                    <div key={item.label} className="flex items-center justify-between text-sm">
-                                      <p>{item.label}</p>
-                                      {item.detected ? (
-                                        <div className="flex items-center gap-2 text-destructive">
-                                          <Icons.alert className="h-4 w-4" />
-                                          <span>Detected</span>
+                          <ScrollArea className="flex-1 -mr-4 pr-4">
+                            <div className="space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                      <div className="flex justify-between items-center">
+                                        <CardTitle className="text-lg">Overall Authenticity</CardTitle>
+                                        <Badge variant={getVerdictBadgeVariant(result.verdict)}>{result.verdict}</Badge>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-baseline gap-4">
+                                            <span className="font-bold text-5xl text-primary">{result.overallScore}</span>
+                                            <span className="text-muted-foreground text-lg">/ 100</span>
                                         </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                          <Icons.checkCircle className="h-4 w-4 text-primary" />
-                                          <span>Not Detected</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
+                                        <Progress value={result.overallScore} indicatorClassName={getProgressIndicatorClassName(result.overallScore)} className="my-3"/>
+                                        <p className="text-sm text-muted-foreground">{result.summary}</p>
+                                    </CardContent>
+                                </Card>
+
+                                <Accordion type="multiple" defaultValue={['reasoning']} className="w-full">
+                                    <AccordionItem value="reasoning">
+                                        <AccordionTrigger>Reasoning</AccordionTrigger>
+                                        <AccordionContent>{result.reasoning}</AccordionContent>
+                                    </AccordionItem>
+                                    <AnalysisItem title="Deepfake Analysis" content={result.deepfake} />
+                                    <AnalysisItem title="Video Manipulation" content={result.videoManipulation} />
+                                    <AnalysisItem title="Synthetic Voice" content={result.syntheticVoice} />
+                                </Accordion>
 
                                 {result.detectedText && (
-                                    <>
-                                      <Separator className="my-4" />
-                                      <Alert className="mt-4">
-                                        <Icons.audio className="h-4 w-4" />
-                                        <AlertTitle>Speech Detected in Video</AlertTitle>
-                                        <AlertDescription className="mt-2">
-                                            <p className="font-semibold mb-2">Transcript:</p>
-                                            <blockquote className="border-l-2 pl-4 italic my-2 text-sm max-h-32 overflow-y-auto">
-                                                {result.detectedText}
-                                            </blockquote>
-                                        </AlertDescription>
-                                      </Alert>
-                                    </>
+                                    <Alert className="mt-4">
+                                    <Icons.audio className="h-4 w-4" />
+                                    <AlertTitle>Speech Detected in Video</AlertTitle>
+                                    <AlertDescription className="mt-2">
+                                        <p className="font-semibold mb-2">Transcript:</p>
+                                        <blockquote className="border-l-2 pl-4 italic my-2 text-sm max-h-32 overflow-y-auto">
+                                            {result.detectedText}
+                                        </blockquote>
+                                    </AlertDescription>
+                                    </Alert>
                                 )}
-                            </ScrollArea>
-                          </div>
+                            </div>
+                          </ScrollArea>
                         )}
                     </CardContent>
                 </Card>

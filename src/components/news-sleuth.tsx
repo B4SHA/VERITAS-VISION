@@ -17,7 +17,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ScrollArea } from "./ui/scroll-area";
 import { useTranslation } from "@/hooks/use-translation";
@@ -135,32 +134,33 @@ export function NewsSleuth() {
   }
 
   const getProgressIndicatorClassName = (score: number) => {
-    if (score < 2) return "bg-destructive";
-    if (score < 3.5) return "bg-accent";
+    if (score < 40) return "bg-destructive";
+    if (score < 70) return "bg-accent";
     return "bg-primary";
   };
   
-  const getAssessmentBadgeVariant = (assessment: string) => {
-    const lowerAssessment = assessment.toLowerCase();
-    if (lowerAssessment.includes('very low') || lowerAssessment.includes('unreliable') || lowerAssessment.includes('sensationalist')) return 'destructive';
-    if (lowerAssessment.includes('low') || lowerAssessment.includes('weak')) return 'destructive';
-    if (lowerAssessment.includes('medium') || lowerAssessment.includes('moderate')) return 'secondary';
-    if (lowerAssessment.includes('high') || lowerAssessment.includes('reliable') || lowerAssessment.includes('neutral')) return 'default';
+  const getVerdictBadgeVariant = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('real')) return 'default';
+    if (lowerVerdict.includes('fake')) return 'destructive';
     return 'secondary';
   };
 
-  const AnalysisItem = ({ title, assessment, points }: { title: string, assessment: string, points: string[] }) => (
+  const AnalysisItem = ({ title, content }: { title: string, content: string | string[] }) => (
     <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
       <AccordionTrigger>
         <div className="flex items-center justify-between w-full">
           <span>{title}</span>
-          <Badge variant={getAssessmentBadgeVariant(assessment)}>{assessment}</Badge>
         </div>
       </AccordionTrigger>
       <AccordionContent>
-        <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-          {points.map((point, i) => <li key={i}>{point}</li>)}
-        </ul>
+        {Array.isArray(content) ? (
+          <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+            {content.map((point, i) => <li key={i}>{point}</li>)}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{content}</p>
+        )}
       </AccordionContent>
     </AccordionItem>
   );
@@ -301,7 +301,7 @@ export function NewsSleuth() {
           
           <Card className="w-full shadow-lg border-2 border-border/80 bg-background/80 backdrop-blur-sm flex flex-col min-h-[500px] lg:min-h-[700px]">
             <CardHeader>
-              <CardTitle className="text-xl">{result ? result.report_title : t('newsSleuth.reportTitle')}</CardTitle>
+              <CardTitle className="text-xl">{t('newsSleuth.reportTitle')}</CardTitle>
               <CardDescription>
                 {t('newsSleuth.reportDescription')}
               </CardDescription>
@@ -335,73 +335,47 @@ export function NewsSleuth() {
 
                       <Card>
                           <CardHeader>
-                              <CardTitle className="text-lg">Overall Score</CardTitle>
+                              <div className="flex justify-between items-center">
+                                <CardTitle className="text-lg">Overall Score</CardTitle>
+                                <Badge variant={getVerdictBadgeVariant(result.verdict)}>{result.verdict}</Badge>
+                              </div>
                           </CardHeader>
                           <CardContent>
                               <div className="flex items-baseline gap-4">
-                                <span className="font-bold text-5xl text-primary">{result.overall_credibility_score.score.toFixed(1)}</span>
-                                <span className="text-muted-foreground text-lg">/ 5.0</span>
+                                <span className="font-bold text-5xl text-primary">{result.overallScore}</span>
+                                <span className="text-muted-foreground text-lg">/ 100</span>
                               </div>
-                              <Progress value={result.overall_credibility_score.score * 20} indicatorClassName={getProgressIndicatorClassName(result.overall_credibility_score.score)} className="my-3"/>
-                              <p className="text-sm text-muted-foreground">{result.overall_credibility_score.reasoning}</p>
+                              <Progress value={result.overallScore} indicatorClassName={getProgressIndicatorClassName(result.overallScore)} className="my-3"/>
+                              <p className="text-sm text-muted-foreground">{result.summary}</p>
                           </CardContent>
                       </Card>
 
-                      <Accordion type="multiple" defaultValue={['analysis']} className="w-full">
-                        <AccordionItem value="analysis">
-                          <AccordionTrigger className="text-lg font-semibold">Detailed Analysis</AccordionTrigger>
-                          <AccordionContent>
-                              <Accordion type="multiple" className="w-full space-y-1">
-                                <AnalysisItem title="Factual Accuracy" assessment={result.analysis.factual_accuracy.assessment} points={result.analysis.factual_accuracy.supporting_points} />
-                                <AnalysisItem title="Source Reliability" assessment={result.analysis.source_reliability.assessment} points={result.analysis.source_reliability.supporting_points} />
-                                <AnalysisItem title="Bias & Manipulation" assessment={result.analysis.bias_manipulation.assessment} points={result.analysis.bias_manipulation.supporting_points} />
-                                <AnalysisItem title="Author Expertise" assessment={result.analysis.author_expertise.assessment} points={result.analysis.author_expertise.supporting_points} />
-                              </Accordion>
-                          </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="recommendations">
-                          <AccordionTrigger className="text-lg font-semibold">Recommendations</AccordionTrigger>
-                          <AccordionContent>
-                            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                {result.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-
-                        <AccordionItem value="details">
-                          <AccordionTrigger className="text-lg font-semibold">Article & Publication Details</AccordionTrigger>
-                          <AccordionContent className="space-y-4">
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-base">Article Details</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-sm space-y-1">
-                                <p><span className="font-semibold text-foreground">Title:</span> {result.article_details.title}</p>
-                                <p><span className="font-semibold text-foreground">Author:</span> {result.article_details.author}</p>
-                                <p><span className="font-semibold text-foreground">Date:</span> {result.article_details.publication_date}</p>
-                                <p><span className="font-semibold text-foreground">Main Claim:</span> {result.article_details.main_claim}</p>
-                                <p><span className="font-semibold text-foreground">URL:</span> <Link href={result.article_details.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{result.article_details.url}</Link></p>
-                                <div className="flex flex-wrap gap-2 pt-2">
-                                  <span className="font-semibold text-foreground">Keywords:</span>
-                                  {result.article_details.keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}
+                      <Accordion type="multiple" defaultValue={['reasoning']} className="w-full">
+                        <AnalysisItem title="Reasoning" content={result.reasoning} />
+                        <AnalysisItem title="Biases" content={result.biases} />
+                        <AnalysisItem title="Flagged Content" content={result.flaggedContent} />
+                        
+                        {result.sources && result.sources.length > 0 && (
+                          <AccordionItem value="sources">
+                             <AccordionTrigger>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>Sources Used</span>
                                 </div>
-                              </CardContent>
-                            </Card>
-                             <Card>
-                              <CardHeader>
-                                <CardTitle className="text-base">Publication Details</CardTitle>
-                              </CardHeader>
-                              <CardContent className="text-sm space-y-1">
-                                <p><span className="font-semibold text-foreground">Name:</span> <Link href={result.publication_details.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{result.publication_details.name}</Link></p>
-                                <p><span className="font-semibold text-foreground">Type:</span> {result.publication_details.publication_type}</p>
-                                <p><span className="font-semibold text-foreground">Reputation:</span> {result.publication_details.reputation}</p>
-                              </CardContent>
-                            </Card>
-                          </AccordionContent>
-                        </AccordionItem>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                                  {result.sources.map((source, i) => (
+                                    <li key={i}>
+                                      <Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                                        {source}
+                                      </Link>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                          </AccordionItem>
+                        )}
                       </Accordion>
-
                   </div>
                 </ScrollArea>
               )}

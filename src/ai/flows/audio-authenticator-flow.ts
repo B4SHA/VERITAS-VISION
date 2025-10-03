@@ -12,12 +12,16 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
   model: 'gemini-2.5-flash',
+  generationConfig: {
+    responseMimeType: 'application/json',
+  },
 });
 
 const AudioAuthenticatorOutputSchema = z.object({
-  confidenceScore: z.number().describe("A score from 0-100 indicating the confidence in the authenticity of the audio."),
+  overallScore: z.number().describe("A score from 0-100 indicating the confidence in the authenticity of the audio."),
   verdict: z.enum(['Likely Authentic', 'Potential AI/Manipulation', 'Uncertain']).describe("The final judgment on the audio's authenticity."),
-  report: z.string().describe("A detailed report explaining the reasoning behind the verdict, including forensic analysis details and contextual information from web searches."),
+  summary: z.string().describe("A brief summary of the findings."),
+  reasoning: z.string().describe("A detailed report explaining the reasoning behind the verdict."),
   detectedText: z.string().optional().describe("The transcribed text from the audio, if any."),
 });
 
@@ -34,24 +38,20 @@ export type AudioAuthenticatorInput = z.infer<typeof AudioAuthenticatorInputSche
 export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSchema>;
 export type AudioAuthenticatorError = { error: string; rawResponse: string };
 
-
 export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput | AudioAuthenticatorError> {
   const audioPart = dataUriToGenerativePart(input.audioDataUri);
 
-  const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery.
+  const prompt = `You are an expert audio forensics analyst. Analyze the provided audio file and generate an authenticity report in ${input.language}.
 
-You will perform the following analysis:
-1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
-2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it and include it in the 'detectedText' field.
-3.  **Content Analysis**: Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
-4.  **Verdict, Confidence, and Report**: Based on all available evidence, provide a final verdict ('Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'), a confidence score (0-100), and generate a comprehensive report detailing your findings and the reasoning for your verdict.
+Your JSON output must include these fields:
+- overallScore: A confidence score (0-100) on the audio's authenticity.
+- verdict: Your final judgment ('Likely Authentic', 'Potential AI/Manipulation', 'Uncertain').
+- summary: A brief summary of your findings.
+- reasoning: Detailed reasoning behind your verdict, mentioning analysis of background noise, speaker tone, cadence, and frequency spectrum.
+- detectedText: If the audio contains speech, transcribe it here. If not, this should be null.
+`;
 
-The output language for the report and analysis must be in the language specified by the user: ${input.language}.
-
-Audio for analysis is provided in the content.
-
-Your final output MUST be only a single JSON object that strictly adheres to the provided schema. Do not include any other text, conversation, or markdown formatting like \`\`\`json.`;
-
+  try {
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [audioPart, { text: prompt }] }],
     });
@@ -81,11 +81,16 @@ Your final output MUST be only a single JSON object that strictly adheres to the
           return AudioAuthenticatorOutputSchema.parse(parsed);
         }
         
-        // If all else fails, throw the original error
-        throw new Error("Failed to find a valid JSON object in the response.");
+        // If all else fails, return error object
+        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+        return { error: 'PARSING_FAILED', rawResponse: text };
       }
     } catch (e) {
         console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
         return { error: 'PARSING_FAILED', rawResponse: text };
     }
+  } catch (error) {
+    console.error("Error during AI generation:", error);
+    return { error: 'GENERATION_FAILED', rawResponse: 'The AI model failed to generate a response.' };
+  }
 }
