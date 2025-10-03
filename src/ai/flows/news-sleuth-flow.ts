@@ -16,6 +16,7 @@ import {
   type NewsSleuthError,
 } from '@/ai/schemas';
 import { googleAI } from '@genkit-ai/google-genai';
+import { fetchWebContent } from '@/ai/tools/web-scraper';
 
 const prompt = ai.definePrompt({
     name: 'newsSleuthPrompt',
@@ -23,6 +24,8 @@ const prompt = ai.definePrompt({
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
     prompt: `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
+
+If an 'articleUrl' is provided, you MUST use the 'fetchWebContent' tool to retrieve the article's text before performing your analysis. If 'articleText' is provided, use that directly.
 
 {{#if articleUrl}}
 Article URL: {{articleUrl}}
@@ -54,6 +57,7 @@ const newsSleuthFlow = ai.defineFlow(
     name: 'newsSleuthFlow',
     inputSchema: NewsSleuthInputSchema,
     outputSchema: NewsSleuthOutputSchema,
+    tools: [fetchWebContent],
   },
   async (input) => {
     const { output } = await prompt(input);

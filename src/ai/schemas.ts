@@ -4,6 +4,7 @@ import { z } from 'zod';
 // News Sleuth Schemas
 export const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
+  articleUrl: z.string().optional().describe('The URL of the news article to be fetched and analyzed.'),
   articleHeadline: z.string().optional().describe('The headline of the news article.'),
   language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
 });
