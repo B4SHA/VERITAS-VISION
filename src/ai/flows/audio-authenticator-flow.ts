@@ -33,11 +33,6 @@ const jsonSchema = zodToJsonSchema(AudioAuthenticatorOutputSchema);
 
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
-    },
     safetySettings: [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -65,6 +60,13 @@ export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput)
 
   const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
 
+Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
+
+JSON Schema:
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
+
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
 2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it.
@@ -83,5 +85,15 @@ Audio for analysis is provided in the content.`;
   });
 
   const responseText = result.response.text();
-  return AudioAuthenticatorOutputSchema.parse(JSON.parse(responseText));
+  try {
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+        return AudioAuthenticatorOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    }
+    return AudioAuthenticatorOutputSchema.parse(JSON.parse(responseText));
+  } catch (e) {
+    console.error("Failed to parse JSON response from model:", responseText);
+    throw new Error("Invalid response from the model. Please try again.");
+  }
 }
+

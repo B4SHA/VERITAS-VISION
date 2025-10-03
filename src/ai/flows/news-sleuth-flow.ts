@@ -33,11 +33,6 @@ const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
 
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
-    },
     safetySettings: [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -72,12 +67,17 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
   }
   
-  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report in JSON format. You have access to Google Search to find real-time information and access URLs.
+  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
 
 **Instructions:**
 1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
 2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
-3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the schema provided in the generation configuration. Do not include any other text, conversation, or markdown formatting.
+3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
+
+JSON Schema:
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
 
 The output language must be: **${input.language}**.
 
@@ -90,5 +90,14 @@ ${articleInfo}
   });
 
   const responseText = result.response.text();
-  return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
+  try {
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+        return NewsSleuthOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    }
+    return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
+  } catch (e) {
+    console.error("Failed to parse JSON response from model:", responseText);
+    throw new Error("Invalid response from the model. Please try again.");
+  }
 }

@@ -37,11 +37,6 @@ const jsonSchema = zodToJsonSchema(ImageVerifierOutputSchema);
 
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
-    },
     safetySettings: [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -69,6 +64,13 @@ export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<
   
   const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
 
+Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
+
+JSON Schema:
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
+
 You will perform the following analysis:
 1.  **AI Generation Detection**: Analyze the image for artifacts characteristic of AI image synthesis (e.g., GANs, diffusion models). Look for tell-tale signs in textures, backgrounds, lighting, and anatomical details.
 2.  **Manipulation Detection**: Look for evidence of digital alteration, such as cloning, splicing, or retouching. Analyze shadows, reflections, and perspectives for inconsistencies.
@@ -86,5 +88,14 @@ Image for analysis is provided in the content.`;
   });
 
   const responseText = result.response.text();
-  return ImageVerifierOutputSchema.parse(JSON.parse(responseText));
+  try {
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+        return ImageVerifierOutputSchema.parse(JSON.parse(jsonMatch[1]));
+    }
+    return ImageVerifierOutputSchema.parse(JSON.parse(responseText));
+  } catch (e) {
+    console.error("Failed to parse JSON response from model:", responseText);
+    throw new Error("Invalid response from the model. Please try again.");
+  }
 }

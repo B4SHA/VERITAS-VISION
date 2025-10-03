@@ -40,11 +40,6 @@ const jsonSchema = zodToJsonSchema(VideoIntegrityOutputSchema);
 
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
-    },
     safetySettings: [
         {
             category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -71,6 +66,13 @@ export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promis
     const videoPart = dataUriToGenerativePart(input.videoDataUri);
 
     const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
+
+Your final output MUST be only a single JSON object that strictly adheres to the schema provided below. Do not include any other text, conversation, or markdown formatting.
+
+JSON Schema:
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
 
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
@@ -99,5 +101,14 @@ Video for analysis is provided in the content.`;
     });
 
     const responseText = result.response.text();
-    return VideoIntegrityOutputSchema.parse(JSON.parse(responseText));
+    try {
+        const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[1]) {
+            return VideoIntegrityOutputSchema.parse(JSON.parse(jsonMatch[1]));
+        }
+        return VideoIntegrityOutputSchema.parse(JSON.parse(responseText));
+    } catch (e) {
+        console.error("Failed to parse JSON response from model:", responseText);
+        throw new Error("Invalid response from the model. Please try again.");
+    }
 }
