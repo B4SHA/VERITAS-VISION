@@ -68,17 +68,21 @@ const model = genAI.getGenerativeModel({
     ],
 });
 
-async function fetchUrl(url: string): Promise<string> {
+async function fetchUrl(url: string): Promise<any> {
     try {
-        const response = await fetch(url);
+        console.log(`Fetching URL: ${url}`);
+        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!response.ok) {
+            return { error: `Failed to fetch URL: ${response.statusText}` };
+        }
         const text = await response.text();
-        // This is a simplified representation. A real implementation would parse the main content.
-        return `(Simulated Scrape) Content from ${url}. First 200 chars: ${text.substring(0, 200)}...`;
-    } catch (e) {
+        return { content: `Content from ${url}: ${text.substring(0, 500)}...` };
+    } catch (e: any) {
         console.error('Fetch failed:', e);
-        return `Failed to fetch URL: ${url}.`;
+        return { error: `Failed to fetch URL: ${url}. Error: ${e.message}` };
     }
 }
+
 
 export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
     let articleInfo = '';
@@ -89,7 +93,7 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
         articleInfo += `Headline: "${input.articleHeadline}"\n`;
     }
     if (input.articleUrl) {
-        articleInfo += `**PRIMARY URL TO FETCH**: ${input.articleUrl}\n\n`;
+        articleInfo += `**PRIMARY URL TO FETCH AND ANALYZE**: ${input.articleUrl}\n\n`;
     }
 
     const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
@@ -98,8 +102,8 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
 
 **Your Task:**
 1.  **Gather Information:**
-    * The provided \`articleInfo\` may contain a URL, a headline, or the full text. If a URL is present, you **MUST** use the \`fetchUrl\` tool to get the content.
-    * You **MUST** use Google Search to find corroborating and contradictory reports from various, diverse, and reputable sources.
+    * The provided \`articleInfo\` may contain a URL, a headline, or the full text. If a URL is present in the \`PRIMARY URL TO FETCH AND ANALYZE\` field, you **MUST** use the \`fetchUrl\` tool to get the content. Do not use Google Search for this initial fetch.
+    * After fetching the primary URL (if provided), you **MUST** use Google Search to find corroborating and contradictory reports from various, diverse, and reputable sources.
 2.  **Analyze the Content:** Assess the article's structure, language, and claims.
 3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search.
 4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
@@ -122,28 +126,36 @@ ${articleInfo}
     const result = await chat.sendMessage(prompt);
     let response = result.response;
 
-    const functionCalls = response.functionCalls();
+    if (response.functionCalls() && response.functionCalls().length > 0) {
+        const functionCalls = response.functionCalls();
+        const functionResponses = [];
 
-    if (functionCalls && functionCalls.length > 0) {
-        const call = functionCalls[0];
-        if (call.name === 'fetchUrl') {
-            const url = call.args.url;
-            const content = await fetchUrl(url);
-            const result2 = await chat.sendMessage(
-                [
-                    {
-                        functionResponse: {
-                            name: 'fetchUrl',
-                            response: { name: 'fetchUrl', content: content },
-                        },
+        for (const call of functionCalls) {
+            if (call.name === 'fetchUrl') {
+                const url = call.args.url;
+                const content = await fetchUrl(url);
+                functionResponses.push({
+                    functionResponse: {
+                        name: 'fetchUrl',
+                        response: content,
                     },
-                ]
-            );
+                });
+            }
+        }
+        
+        if (functionResponses.length > 0) {
+            const result2 = await chat.sendMessage(functionResponses);
             response = result2.response;
         }
     }
     
     const responseText = response.text();
     const jsonText = responseText.replace(/```json\n?/, '').replace(/```$/, '');
-    return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
+    
+    try {
+        return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
+    } catch(e) {
+        console.error("Failed to parse JSON response from model:", jsonText);
+        throw new Error("The model returned an invalid response. Please try again.");
+    }
 }

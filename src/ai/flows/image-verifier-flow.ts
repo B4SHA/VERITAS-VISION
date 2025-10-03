@@ -60,6 +60,8 @@ const model = genAI.getGenerativeModel({
             threshold: HarmBlockThreshold.BLOCK_NONE,
         },
     ],
+    // @ts-ignore
+    tools: [{ "google_search": {} }],
 });
 
 export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
@@ -81,8 +83,6 @@ Image for analysis is provided in the content.`;
 
   const result = await model.generateContent({
       contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-      // @ts-ignore
-      tools: [{ "google_search": {} }],
   });
 
   const responseText = result.response.text();

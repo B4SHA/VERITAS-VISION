@@ -63,6 +63,8 @@ const model = genAI.getGenerativeModel({
             threshold: HarmBlockThreshold.BLOCK_NONE,
         },
     ],
+    // @ts-ignore
+    tools: [{ "google_search": {} }],
 });
 
 export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
@@ -94,8 +96,6 @@ Video for analysis is provided in the content.`;
 
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [videoPart, { text: prompt }] }],
-        // @ts-ignore
-        tools: [{ "google_search": {} }],
     });
 
     const responseText = result.response.text();
