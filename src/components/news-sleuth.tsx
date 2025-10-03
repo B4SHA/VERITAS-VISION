@@ -126,7 +126,7 @@ export function NewsSleuth() {
             description: analysisResult.details || "The AI model failed to generate a response.",
         });
       } else if (analysisResult) {
-        setResult(analysisResult);
+        setResult(analysisResult as NewsSleuthOutput);
       } else {
         setErrorResponse({error: "NO_RESPONSE", details: "An unexpected response was received from the server."});
       }

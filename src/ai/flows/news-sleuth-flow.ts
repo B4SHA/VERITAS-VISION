@@ -7,7 +7,7 @@
  * analyzes news articles for credibility by calling the Gemini API directly.
  */
 
-import { GoogleGenerativeAI, type GenerateContentRequest, type Part } from '@google/generative-ai';
+import { GoogleGenerativeAI, type GenerateContentRequest } from '@google/generative-ai';
 import {
   type NewsSleuthInput,
   type NewsSleuthOutput,
@@ -65,8 +65,10 @@ export async function newsSleuthAnalysis(
     const functionCalls = response.functionCalls();
     if (functionCalls) {
          for (const call of functionCalls) {
-            if (call.name === 'googleSearch') {
-                sources = call.args.results.map((r: any) => r.uri);
+            // This is a specific check for the googleSearch tool defined in the model.
+            // It assumes a structure where the tool call arguments contain a 'results' array.
+            if (call.name === 'googleSearch' && call.args && Array.isArray((call.args as any).results)) {
+                 sources = (call.args as any).results.map((r: any) => r.uri).filter(Boolean);
             }
         }
     }
@@ -90,9 +92,9 @@ export async function newsSleuthAnalysis(
         };
     }
     
-    // Add the sources to the output
+    // Add the sources to the output, even if they were already present
     if(sources.length > 0) {
-        output.sources = sources;
+        output.sources = Array.from(new Set([...(output.sources || []), ...sources]));
     }
     
     return output;
