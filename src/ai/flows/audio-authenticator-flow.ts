@@ -18,10 +18,7 @@ const AudioAuthenticatorOutputSchema = z.object({
   confidenceScore: z.number().describe("A score from 0-100 indicating the confidence in the authenticity of the audio."),
   verdict: z.enum(['Likely Authentic', 'Potential AI/Manipulation', 'Uncertain']).describe("The final judgment on the audio's authenticity."),
   report: z.string().describe("A detailed report explaining the reasoning behind the verdict, including forensic analysis details and contextual information from web searches."),
-  textAnalysis: z.object({
-    detectedText: z.string().optional().describe("The transcribed text from the audio, if any."),
-    analysis: z.string().optional().describe("An analysis of the transcribed text for potential misinformation or manipulation."),
-  }).optional(),
+  detectedText: z.string().optional().describe("The transcribed text from the audio, if any."),
 });
 
 const AudioAuthenticatorInputSchema = z.object({
@@ -44,12 +41,11 @@ export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput)
 
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
-2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it.
+2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it and include it in the 'detectedText' field.
 3.  **Content Analysis & Web Search**:
     *   Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
     *   Based on the transcribed text, speakers, or key topics, use Google Search to find context. Look for fact-checks, news reports, or the original source of the audio.
-4.  **Verdict and Confidence**: Based on all available evidence (forensic and web search), provide a final verdict: 'Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'. Also, provide a confidence score (0-100) for your verdict.
-5.  **Reporting**: Generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
+4.  **Verdict, Confidence, and Report**: Based on all available evidence (forensic and web search), provide a final verdict ('Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'), a confidence score (0-100), and generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 

@@ -24,20 +24,10 @@ const VideoIntegrityInputSchema = z.object({
 });
 
 const VideoIntegrityOutputSchema = z.object({
-  analysis: z.object({
-    confidenceScore: z.number().describe("Overall confidence score (0-100) in the analysis provided."),
-    summary: z.string().describe("A concise summary of the overall findings from the video analysis, including context from web search."),
-    deepfake: z.boolean().describe("Indicates if deepfake techniques (e.g., face swapping) are detected."),
-    videoManipulation: z.boolean().describe("Indicates if general video manipulations (e.g., cuts, speed changes, CGI) are detected."),
-    syntheticVoice: z.boolean().describe("Indicates if the audio track contains synthetic or cloned voices."),
-    fullyAiGenerated: z.boolean().describe("Indicates if the entire video is likely to be synthetically generated."),
-    satireParody: z.boolean().describe("Indicates if the content is likely intended as satire or parody."),
-    misleadingContext: z.boolean().describe("Indicates if the video might be authentic but used in a misleading context, based on web search."),
-    audioTextAnalysis: z.object({
-      detectedText: z.string().optional().describe("Transcribed text from the video's audio track."),
-      analysis: z.string().optional().describe("An analysis of the transcribed text for misinformation or manipulation."),
-    }).optional(),
-  }),
+  confidenceScore: z.number().describe("Overall confidence score (0-100) in the analysis provided."),
+  verdict: z.string().describe("A concise verdict on the video's authenticity (e.g., 'Likely Authentic', 'Contains Deepfake Elements', 'Manipulated')."),
+  report: z.string().describe("A comprehensive report detailing all findings from the visual, audio, and contextual analysis."),
+  detectedText: z.string().optional().describe("Transcribed text from the video's audio track."),
 });
 
 export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
@@ -50,22 +40,11 @@ export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promis
   const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
 You will perform a multi-modal analysis:
-1.  **Visual Analysis**:
-    *   Examine each frame for artifacts related to deepfakes (e.g., unnatural facial movements, poor lip-syncing, edge anomalies).
-    *   Look for signs of video manipulation (e.g., edits, CGI, doctored objects, temporal inconsistencies).
-2.  **Audio Analysis**:
-    *   Analyze the audio track for signs of voice cloning, synthesis, or manipulation.
-    *   Check for inconsistencies between the audio and the visual scene.
-3.  **Speech-to-Text & Content Analysis**:
-    *   Transcribe any spoken words in the video.
-    *   Analyze the transcribed text for misinformation, propaganda, or out-of-context statements.
-4.  **Contextual Web Search**:
-    *   Based on the visual content, transcribed text, and any identifiable people or locations, use Google Search.
-    *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
-5.  **Overall Assessment**:
-    *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
-    *   Determine if the video is a deepfake, manipulated, fully AI-generated, satire, or being used in a misleading context.
-    *   Provide a confidence score for your overall analysis.
+1.  **Visual Analysis**: Examine frames for artifacts related to deepfakes, CGI, edits, and other manipulations.
+2.  **Audio Analysis**: Analyze the audio for voice cloning, synthesis, or manipulation.
+3.  **Speech-to-Text**: Transcribe any spoken words and include them in the 'detectedText' field.
+4.  **Contextual Web Search**: Use Google Search to find context, fact-checks, or the origin of the video.
+5.  **Overall Assessment**: Synthesize all findings into a holistic judgment. Provide a final 'verdict', a 'confidenceScore' (0-100), and a detailed 'report' that explains your reasoning based on all analysis steps.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 

@@ -30,19 +30,6 @@ const formSchema = z.object({
     .refine((files) => files?.[0]?.size <= 10 * 1024 * 1024, "File size should be less than 10MB."),
 });
 
-function AnalysisItem({ label, value }: { label: string; value: boolean }) {
-    return (
-        <div className="flex items-center justify-between text-sm py-2 px-3">
-            <span className="text-muted-foreground">{label}</span>
-            {value ? (
-                <span className="flex items-center font-medium text-destructive"><Icons.alert className="mr-1.5 h-4 w-4" /> Detected</span>
-            ) : (
-                <span className="flex items-center font-medium text-primary"><Icons.checkCircle className="mr-1.5 h-4 w-4" /> Not Detected</span>
-            )}
-        </div>
-    );
-}
-
 export function ImageVerifier() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ImageVerifierOutput | null>(null);
@@ -90,28 +77,18 @@ export function ImageVerifier() {
     return "bg-primary";
   };
 
-  const getVerdictBadgeVariant = (verdict: 'Likely Authentic' | 'Likely AI-Generated/Manipulated' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Authentic':
-        return 'default';
-      case 'Likely AI-Generated/Manipulated':
-        return 'destructive';
-      case 'Uncertain':
-      default:
-        return 'secondary';
-    }
+  const getVerdictBadgeVariant = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('authentic')) return 'default';
+    if (lowerVerdict.includes('ai-generated') || lowerVerdict.includes('manipulated')) return 'destructive';
+    return 'secondary';
   };
 
-  const getVerdictIcon = (verdict: 'Likely Authentic' | 'Likely AI-Generated/Manipulated' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Authentic':
-        return <Icons.check className="mr-1.5" />;
-      case 'Likely AI-Generated/Manipulated':
-        return <Icons.alert className="mr-1.5" />;
-      case 'Uncertain':
-      default:
-        return <Icons.help className="mr-1.5" />;
-    }
+  const getVerdictIcon = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('authentic')) return <Icons.check className="mr-1.5" />;
+    if (lowerVerdict.includes('ai-generated') || lowerVerdict.includes('manipulated')) return <Icons.alert className="mr-1.5" />;
+    return <Icons.help className="mr-1.5" />;
   };
 
   return (
@@ -217,38 +194,21 @@ export function ImageVerifier() {
                           <Progress value={result.confidenceScore} indicatorClassName={getProgressIndicatorClassName(result.confidenceScore)} />
                         </div>
                         <Separator />
-                        <div className="divide-y rounded-md border bg-muted/20">
-                            <AnalysisItem label="AI-Generated" value={result.isAiGenerated} />
-                            <AnalysisItem label="Digital Manipulation" value={result.isManipulated} />
-                            <AnalysisItem label="Misleading Context" value={result.isMisleadingContext} />
-                        </div>
-                        
-                        {result.textAnalysis?.detectedText && (
+                                                
+                        {result.detectedText && (
                             <>
-                              <Separator />
                               <Alert>
                                 <Icons.news className="h-4 w-4" />
                                 <AlertTitle>Text Detected in Image</AlertTitle>
                                 <AlertDescription className="mt-2">
                                     <blockquote className="border-l-2 pl-4 italic my-2 text-sm max-h-32 overflow-y-auto">
-                                        {result.textAnalysis.detectedText}
+                                        {result.detectedText}
                                     </blockquote>
-                                    <p className="font-semibold mt-3 mb-1">Text Analysis:</p>
-                                    <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
-                                      {result.textAnalysis.analysis}
-                                    </p>
                                 </AlertDescription>
                               </Alert>
+                              <Separator />
                             </>
                         )}
-                        <Separator />
-                        <div>
-                            <h3 className="font-semibold text-lg mb-2">Image Context</h3>
-                            <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
-                                {result.context}
-                            </p>
-                        </div>
-                        <Separator />
                         <div>
                             <h3 className="font-semibold text-lg mb-2">Image Forensics Report</h3>
                             <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">

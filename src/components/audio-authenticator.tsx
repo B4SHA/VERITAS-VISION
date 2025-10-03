@@ -76,28 +76,18 @@ export function AudioAuthenticator() {
     return "bg-primary";
   };
 
-  const getVerdictBadgeVariant = (verdict: 'Likely Authentic' | 'Potential AI/Manipulation' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Authentic':
-        return 'default';
-      case 'Potential AI/Manipulation':
-        return 'destructive';
-      case 'Uncertain':
-      default:
-        return 'secondary';
-    }
+  const getVerdictBadgeVariant = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('authentic')) return 'default';
+    if (lowerVerdict.includes('ai') || lowerVerdict.includes('manipulation')) return 'destructive';
+    return 'secondary';
   };
 
-  const getVerdictIcon = (verdict: 'Likely Authentic' | 'Potential AI/Manipulation' | 'Uncertain') => {
-    switch (verdict) {
-      case 'Likely Authentic':
-        return <Icons.check className="mr-1.5" />;
-      case 'Potential AI/Manipulation':
-        return <Icons.alert className="mr-1.5" />;
-      case 'Uncertain':
-      default:
-        return <Icons.help className="mr-1.5" />;
-    }
+  const getVerdictIcon = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('authentic')) return <Icons.check className="mr-1.5" />;
+    if (lowerVerdict.includes('ai') || lowerVerdict.includes('manipulation')) return <Icons.alert className="mr-1.5" />;
+    return <Icons.help className="mr-1.5" />;
   };
 
   return (
@@ -204,7 +194,7 @@ export function AudioAuthenticator() {
                         </div>
                         <Separator/>
 
-                        {result.textAnalysis?.detectedText && (
+                        {result.detectedText && (
                             <>
                                 <Alert>
                                     <Icons.news className="h-4 w-4" />
@@ -212,12 +202,8 @@ export function AudioAuthenticator() {
                                     <AlertDescription className="mt-2">
                                         <p className="font-semibold mb-2">Transcript:</p>
                                         <blockquote className="border-l-2 pl-4 italic my-2 text-sm max-h-24 overflow-y-auto">
-                                            {result.textAnalysis.detectedText}
+                                            {result.detectedText}
                                         </blockquote>
-                                        <p className="font-semibold mt-3 mb-1">Content Analysis:</p>
-                                        <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap break-words">
-                                            {result.textAnalysis.analysis}
-                                        </p>
                                     </AlertDescription>
                                 </Alert>
                                 <Separator />
