@@ -1,7 +1,6 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { cleanJsonSchema } from "@/lib/utils";
@@ -25,138 +24,74 @@ const NewsSleuthOutputSchema = z.object({
   }),
 });
 
+
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
-const fetchUrlTool = {
-    "functionDeclarations": [
-        {
-            "name": "fetchUrl",
-            "description": "Fetches the text content of a publicly accessible web page URL.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": { "type": "string", "description": "The full URL of the page to fetch." },
-                },
-                "required": ["url"],
-            }
-        }
-    ]
-};
-
-const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    tools: [fetchUrlTool, { "googleSearch": {} }],
-});
-
-async function fetchUrl(url: string): Promise<any> {
-    try {
-        console.log(`Fetching URL: ${url}`);
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (!response.ok) {
-            return { error: `Failed to fetch URL: ${response.statusText}` };
-        }
-        const text = await response.text();
-        return { content: `Content from ${url}: ${text.substring(0, 500)}...` };
-    } catch (e: any) {
-        console.error('Fetch failed:', e);
-        return { error: `Failed to fetch URL: ${url}. Error: ${e.message}` };
-    }
+async function callSonarWithSearch(prompt: string): Promise<string> {
+  const apiKey = process.env.PPLX_API_KEY;
+  if (!apiKey) {
+    throw new Error("Perplexity API key (PPLX_API_KEY) is not set in the environment.");
+  }
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "sonar-large-reasoning-online",
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("Perplexity API error: " + (await response.text()));
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content ?? '';
 }
 
-
 export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-    let articleInfo = '';
-    if (input.articleText) {
-        articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
-    }
-    if (input.articleHeadline) {
-        articleInfo += `Headline: "${input.articleHeadline}"\n`;
-    }
-    if (input.articleUrl) {
-        articleInfo += `**PRIMARY URL TO FETCH AND ANALYZE**: ${input.articleUrl}\n\n`;
-    }
+  let articleInfo = '';
+  if (input.articleText) {
+    articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
+  }
+  if (input.articleHeadline) {
+    articleInfo += `Headline: "${input.articleHeadline}"\n`;
+  }
+  if (input.articleUrl) {
+    articleInfo += `**PRIMARY URL TO ANALYZE**: ${input.articleUrl}\n\n`;
+  }
 
-    const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
-
-    const prompt = `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
+  const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+  const prompt = `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
 
 **Your Task:**
-1.  **Gather Information:**
-    * The provided \`articleInfo\` may contain a URL, a headline, or the full text. If a URL is present in the \`PRIMARY URL TO FETCH AND ANALYZE\` field, you **MUST** use the \`fetchUrl\` tool to get the content. Do not use Google Search for this initial fetch.
-    * After fetching the primary URL (if provided), you **MUST** use Google Search to find corroborating and contradictory reports from various, diverse, and reputable sources.
-2.  **Analyze the Content:** Assess the article's structure, language, and claims.
-3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search.
-4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
-5.  **Generate Credibility Report:** You must respond with a valid JSON object that conforms to the following JSON Schema. Do not output any text or markdown formatting before or after the JSON object.
-    
-    \`\`\`json
-    ${JSON.stringify(cleanJsonSchema(jsonSchema))}
-    \`\`\`
+1. Gather information using your integrated web search.
+2. Analyze the article's structure, language, and claims.
+3. Fact-check claims against your web search results.
+4. Investigate the reputation of the publication and the author.
+5. Generate a credibility report in JSON that matches the schema below. Do not add any conversational text or markdown formatting before or after the JSON object.
 
-The output language for the report must be in the language specified by the user: **${input.language}**.
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
+
+The output must be in the language specified by the user: **${input.language}**.
 
 **Article Information for Analysis:**
 ${articleInfo}
 `;
-    
-    const chat = model.startChat({
-        tools: [fetchUrlTool, { "googleSearch": {} }],
-    });
 
-    const result = await chat.sendMessage(prompt);
-    let response = result.response;
+  const responseText = await callSonarWithSearch(prompt);
 
-    if (response.functionCalls && response.functionCalls().length > 0) {
-        const functionCalls = response.functionCalls();
-        const functionResponses = [];
-
-        for (const call of functionCalls) {
-            if (call.name === 'fetchUrl') {
-                const url = call.args.url;
-                const content = await fetchUrl(url);
-                functionResponses.push({
-                    functionResponse: {
-                        name: 'fetchUrl',
-                        response: content,
-                    },
-                });
-            }
-        }
-        
-        if (functionResponses.length > 0) {
-            const result2 = await chat.sendMessage(JSON.stringify(functionResponses));
-            response = result2.response;
-        }
-    }
-    
-    const responseText = response.text();
-    const jsonText = responseText.replace(/```json\n?/, '').replace(/```$/, '');
-    
-    try {
-        return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
-    } catch(e) {
-        console.error("Failed to parse JSON response from model:", jsonText);
-        throw new Error("The model returned an invalid response. Please try again.");
-    }
+  const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+  const jsonText = jsonMatch ? jsonMatch[1] : responseText;
+  
+  try {
+    return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
+  } catch (e) {
+    console.error("Failed to parse JSON response from model:", jsonText);
+    throw new Error("Invalid response from Sonar model. Please try again.");
+  }
 }
