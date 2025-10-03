@@ -62,17 +62,30 @@ Your final output MUST be only a single JSON object that strictly adheres to the
     let text = response.text();
 
     try {
-        if (text.startsWith("```json")) {
-          text = text.substring(7, text.length - 3);
+      // First, try to parse directly
+      try {
+        const parsed = JSON.parse(text);
+        return AudioAuthenticatorOutputSchema.parse(parsed);
+      } catch (e) {
+        // If direct parse fails, try to extract from markdown
+        const match = text.match(/```json\n([\s\S]*?)\n```/);
+        if (match && match[1]) {
+          const parsed = JSON.parse(match[1]);
+          return AudioAuthenticatorOutputSchema.parse(parsed);
         }
+
+        // If markdown extraction fails, try to find the JSON object manually
         const startIndex = text.indexOf('{');
         const endIndex = text.lastIndexOf('}');
         if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-          text = text.substring(startIndex, endIndex + 1);
+          const jsonString = text.substring(startIndex, endIndex + 1);
+          const parsed = JSON.parse(jsonString);
+          return AudioAuthenticatorOutputSchema.parse(parsed);
         }
-
-        const parsed = JSON.parse(text);
-        return AudioAuthenticatorOutputSchema.parse(parsed);
+        
+        // If all else fails, throw the original error
+        throw new Error("Failed to find a valid JSON object in the response.");
+      }
     } catch (e) {
         console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
         throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
