@@ -79,7 +79,7 @@ Your final output MUST be only a single JSON object that strictly adheres to the
         const parsed = JSON.parse(text);
         return VideoIntegrityOutputSchema.parse(parsed);
     } catch (e) {
-        console.error("Failed to parse LLM response:", text);
-        throw new Error("The AI returned an invalid response format.");
+        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+        throw new Error("The AI returned an invalid response format. Check the server logs for the raw output.");
     }
 }
