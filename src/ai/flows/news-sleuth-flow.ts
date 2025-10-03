@@ -17,7 +17,13 @@ import {
 } from '@/ai/schemas';
 import { googleAI } from '@genkit-ai/google-genai';
 
-const newsSleuthPrompt = `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
+const newsSleuthPrompt = ai.definePrompt({
+  name: 'newsSleuthPrompt',
+  model: googleAI.model('gemini-2.5-flash'),
+  tools: ['googleSearch'],
+  input: { schema: NewsSleuthInputSchema },
+  output: { schema: NewsSleuthOutputSchema },
+  prompt: `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
 
 If an 'articleUrl' is provided, you MUST use your search tool to retrieve the article's content and corroborate facts before performing your analysis. If 'articleText' is provided, use that directly.
 
@@ -42,7 +48,8 @@ Your JSON output must include these fields:
 - flaggedContent: A list of specific issues found (e.g., sensationalism, logical fallacies).
 - reasoning: The reasoning behind the overall verdict and score.
 - sources: A list of URLs you used from your search tool to corroborate facts. This MUST be populated from your search results.
-`;
+`,
+});
 
 
 const newsSleuthFlow = ai.defineFlow(
@@ -52,15 +59,7 @@ const newsSleuthFlow = ai.defineFlow(
     outputSchema: NewsSleuthOutputSchema,
   },
   async (input) => {
-    const { output } = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash'),
-      prompt: newsSleuthPrompt,
-      input,
-      tools: ['googleSearch'],
-      output: {
-        schema: NewsSleuthOutputSchema,
-      }
-    });
+    const { output } = await newsSleuthPrompt(input);
 
     if (!output) {
       throw new Error('The AI model did not produce any output.');
