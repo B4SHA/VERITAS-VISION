@@ -4,7 +4,7 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { dataUriToGenerativePart } from "@/lib/utils";
+import { dataUriToGenerativePart, cleanJsonSchema } from "@/lib/utils";
 
 const ImageVerifierInputSchema = z.object({
   imageDataUri: z
@@ -33,12 +33,14 @@ export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const jsonSchema = zodToJsonSchema(ImageVerifierOutputSchema);
+
 const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
     generationConfig: {
         response_mime_type: "application/json",
         // @ts-ignore
-        response_schema: zodToJsonSchema(ImageVerifierOutputSchema),
+        response_schema: cleanJsonSchema(jsonSchema),
     },
     safetySettings: [
         {

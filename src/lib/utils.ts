@@ -32,3 +32,16 @@ export function dataUriToGenerativePart(dataUri: string): Part {
     },
   };
 }
+
+export function cleanJsonSchema(schema: any): any {
+  if (schema && typeof schema === 'object') {
+    delete schema.$schema;
+    delete schema.additionalProperties;
+    for (const key in schema.properties) {
+      if (schema.properties.hasOwnProperty(key)) {
+        schema.properties[key] = cleanJsonSchema(schema.properties[key]);
+      }
+    }
+  }
+  return schema;
+}

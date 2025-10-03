@@ -4,6 +4,7 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { cleanJsonSchema } from "@/lib/utils";
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -45,12 +46,14 @@ const fetchUrlTool = {
     ]
 };
 
+const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+
 const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
     generationConfig: {
         response_mime_type: "application/json",
         // @ts-ignore
-        response_schema: zodToJsonSchema(NewsSleuthOutputSchema),
+        response_schema: cleanJsonSchema(jsonSchema),
     },
     safetySettings: [
         {
