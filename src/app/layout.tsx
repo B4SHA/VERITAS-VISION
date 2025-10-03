@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { LanguageProvider } from '@/hooks/use-language';
+import { LanguageProvider } from '@/context/language-context';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { Header } from '@/components/header';
@@ -19,7 +19,7 @@ const fontHeading = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Veritas Vision',
+  title: 'Misinformation Mitigator',
   description: 'Analyze media for authenticity and credibility.',
 };
 
@@ -41,13 +41,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider>
-            <LanguageProvider>
-              <Header />
-              {children}
-              <Toaster />
-            </LanguageProvider>
-          </SidebarProvider>
+          <LanguageProvider>
+            <SidebarProvider>
+                <Header />
+                {children}
+                <Toaster />
+            </SidebarProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

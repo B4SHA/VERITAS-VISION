@@ -1,12 +1,16 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useMemo } from 'react';
 
-export type Language = 'en';
+export type Language = 'en' | 'hi' | 'bn' | 'mr' | 'te' | 'ta';
 
 export const languages: { value: Language; label: string }[] = [
   { value: 'en', label: 'English' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'bn', label: 'Bengali' },
+  { value: 'mr', label: 'Marathi' },
+  { value: 'te', label: 'Telugu' },
+  { value: 'ta', label: 'Tamil' },
 ];
 
 const translations: Record<string, Record<Language, string>> = {};

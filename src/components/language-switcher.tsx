@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { languages, useLanguage } from '@/hooks/use-language';
+import { languages, useLanguage } from '@/context/language-context';
 import {
   Select,
   SelectContent,
