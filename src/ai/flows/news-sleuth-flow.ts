@@ -11,9 +11,6 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({
   model: 'gemini-2.5-flash',
-  generationConfig: {
-    responseMimeType: 'application/json',
-  },
 });
 
 const NewsSleuthInputSchema = z.object({
@@ -72,14 +69,45 @@ ${articleInfo}`;
     });
     
     const response = result.response;
-    const text = response.text();
+    let text = response.text();
     
     try {
-      const parsed = JSON.parse(text);
-      return NewsSleuthOutputSchema.parse(parsed);
+      // First, try to parse directly
+      try {
+        const parsed = JSON.parse(text);
+        return NewsSleuthOutputSchema.parse(parsed);
+      } catch (e) {
+        // If direct parse fails, try to extract from markdown
+        const match = text.match(/```json\n([\s\S]*?)\n```/);
+        if (match && match[1]) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            return NewsSleuthOutputSchema.parse(parsed);
+          } catch(e2) {
+             console.error("Failed to parse extracted markdown JSON:", match[1]);
+          }
+        }
+
+        // If markdown extraction fails, try to find the JSON object manually
+        const startIndex = text.indexOf('{');
+        const endIndex = text.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+          const jsonString = text.substring(startIndex, endIndex + 1);
+          try {
+            const parsed = JSON.parse(jsonString);
+            return NewsSleuthOutputSchema.parse(parsed);
+          } catch(e3) {
+            console.error("Failed to parse substring JSON:", jsonString);
+          }
+        }
+        
+        // If all else fails, return error object
+        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+        return { error: 'PARSING_FAILED', rawResponse: text };
+      }
     } catch (e) {
-      console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
-      return { error: 'PARSING_FAILED', rawResponse: text };
+        console.error("RAW AI RESPONSE THAT FAILED TO PARSE:", text);
+        return { error: 'PARSING_FAILED', rawResponse: text };
     }
   } catch (error) {
     console.error("Error during AI generation:", error);
