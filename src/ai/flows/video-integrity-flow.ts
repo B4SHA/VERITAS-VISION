@@ -43,9 +43,7 @@ const prompt = ai.definePrompt({
     name: 'videoIntegrityPrompt',
     input: { schema: VideoIntegrityInputSchema },
     output: { schema: VideoIntegrityOutputSchema },
-    config: {
-      grounding: 'web',
-    },
+    tools: [{googleSearch: {}}],
     prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation, grounded in real-time web search results.
 
 You will perform a multi-modal analysis:
