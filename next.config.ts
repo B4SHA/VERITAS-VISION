@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    serverActions: {
+      maxDuration: 120, // Increase timeout to 120 seconds
+    },
+  },
 };
 
 export default nextConfig;
