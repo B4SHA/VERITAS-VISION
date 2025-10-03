@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
 You will perform the following analysis:
 1.  **AI Generation Detection**: Analyze the image for artifacts characteristic of AI image synthesis (e.g., GANs, diffusion models). Look for tell-tale signs in textures, backgrounds, lighting, and anatomical details.
 2.  **Manipulation Detection**: Look for evidence of digital alteration, such as cloning, splicing, or retouching. Analyze shadows, reflections, and perspectives for inconsistencies.
-3.  **Contextual Analysis (Web Search)**: You MUST perform a conceptual reverse image search using your web search capabilities. Determine the likely origin and context of the image. Is it being used out of context to spread misinformation? Find news articles, fact-checks, or other sources discussing the image.
+3.  **Contextual Analysis (Web Search)**: You MUST use the provided Google Search tool to perform a conceptual reverse image search. Determine the likely origin and context of the image. Is it being used out of context to spread misinformation? Find news articles, fact-checks, or other sources discussing the image.
 4.  **Text Analysis (OCR)**: If there is text in the image, extract it and analyze it for misinformation.
 5.  **Verdict and Confidence**: Provide a final verdict ('Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain') and a confidence score (0-100).
 6.  **Reporting**: Generate a comprehensive report detailing your findings, including the forensic methods used and the reasoning for your verdict based on both the image analysis and web search results.

@@ -58,7 +58,7 @@ You will perform a multi-modal analysis:
     *   Transcribe any spoken words in the video.
     *   Analyze the transcribed text for misinformation, propaganda, or out-of-context statements.
 4.  **Contextual Web Search**:
-    *   Based on the visual content, transcribed text, and any identifiable people or locations, you MUST perform a web search.
+    *   Based on the visual content, transcribed text, and any identifiable people or locations, you MUST use the provided Google Search tool.
     *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
 5.  **Overall Assessment**:
     *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
