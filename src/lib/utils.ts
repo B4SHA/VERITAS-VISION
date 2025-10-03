@@ -19,14 +19,16 @@ export function fileToDataUri(file: File): Promise<string> {
 }
 
 export function dataUriToGenerativePart(dataUri: string): Part {
-  const match = dataUri.match(/^data:(.+);base64,(.+)$/);
-  if (!match) {
+  const mimeTypeMatch = dataUri.substring(dataUri.indexOf(':') + 1, dataUri.indexOf(';'));
+  const base64 = dataUri.substring(dataUri.indexOf(',') + 1);
+
+  if (!mimeTypeMatch || !base64) {
     throw new Error('Invalid data URI');
   }
-  const [_, mimeType, base64] = match;
+
   return {
     inlineData: {
-      mimeType,
+      mimeType: mimeTypeMatch,
       data: base64,
     },
   };

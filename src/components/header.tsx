@@ -30,7 +30,7 @@ export function Header() {
         <Link href="/" className="flex items-center space-x-2">
           <Icons.shield className="h-8 w-8 text-primary" />
           <span className="text-xl font-bold tracking-tight text-foreground">
-            Misinformation Mitigator
+            Veritas Vision
           </span>
         </Link>
         
@@ -95,7 +95,7 @@ export function Header() {
                 <Link href="/" className="flex items-center space-x-2 mb-6">
                   <Icons.shield className="h-8 w-8 text-primary" />
                   <span className="text-xl font-bold tracking-tight text-foreground">
-                    Misinformation Mitigator
+                    Veritas Vision
                   </span>
                 </Link>
                 <div className="grid gap-4 py-2">
