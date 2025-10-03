@@ -1,7 +1,7 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, FunctionDeclarationSchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 
 const NewsSleuthInputSchema = z.object({
@@ -34,9 +34,9 @@ const fetchUrlTool = {
             "name": "fetchUrl",
             "description": "Fetches the text content of a publicly accessible web page URL.",
             "parameters": {
-                "type": FunctionDeclarationSchemaType.OBJECT,
+                "type": "object",
                 "properties": {
-                    "url": { "type": FunctionDeclarationSchemaType.STRING, "description": "The full URL of the page to fetch." },
+                    "url": { "type": "string", "description": "The full URL of the page to fetch." },
                 },
                 "required": ["url"],
             }
