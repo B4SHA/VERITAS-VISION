@@ -4,6 +4,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
+
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
   articleUrl: z.string().optional().describe('The URL of the news article.'),
@@ -79,7 +80,7 @@ const newsSleuthPrompt = ai.definePrompt({
     },
     output: { schema: NewsSleuthOutputSchema },
     // Tools are now 'googleSearch' (built-in) AND our custom tool
-    tools: ['googleSearch', fetchUrlTool], 
+    tools: ['googleSearch', fetchUrlTool.name], 
     prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
 
 **Your Task:**
