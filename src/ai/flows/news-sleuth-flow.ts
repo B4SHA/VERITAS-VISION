@@ -1,7 +1,6 @@
 
 'use server';
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { cleanJsonSchema } from "@/lib/utils";
@@ -25,43 +24,33 @@ const NewsSleuthOutputSchema = z.object({
   }),
 });
 
-
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
-
-const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
-    generationConfig: {
-        response_mime_type: "application/json",
-        // @ts-ignore
-        response_schema: cleanJsonSchema(jsonSchema),
+async function callSonarWithSearch(prompt: string): Promise<string> {
+  const apiKey = process.env.PPLX_API_KEY;
+  if (!apiKey) {
+    throw new Error("PPLX_API_KEY is not set in the environment variables.");
+  }
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-    safetySettings: [
-        {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-        {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-        },
-    ],
-    // @ts-ignore
-    tools: [{ "google_search": {} }],
-});
-
+    body: JSON.stringify({
+      model: "sonar-large-reasoning-online",
+      messages: [{ role: "user", content: prompt }],
+      stream: false
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Perplexity API error: ${response.status} ${await response.text()}`);
+  }
+  const data = await response.json();
+  console.log("Raw Perplexity API response:", JSON.stringify(data, null, 2));
+  return data.choices?.[0]?.message?.content ?? '';
+}
 
 export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
   let articleInfo = '';
@@ -72,35 +61,40 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `Headline: "${input.articleHeadline}"\n`;
   }
   if (input.articleUrl) {
-    articleInfo += `**PRIMARY URL TO ANALYZE AND FETCH CONTENT FROM**: ${input.articleUrl}\n\n`;
+    // This is the critical part for URL analysis
+    articleInfo += `**You MUST fetch and analyze the content from this primary URL**: ${input.articleUrl}\n\n`;
   }
 
-  const prompt = `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report.
+  const jsonSchema = zodToJsonSchema(NewsSleuthOutputSchema);
+  
+  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL, analyze it, and then generate a credibility report in JSON format.
 
-**Critically, if a URL is provided, you MUST fetch its content and base your entire analysis on that content.**
+**Instructions:**
+1.  **FETCH CONTENT**: Access the URL provided below in the "Article Information for Analysis" section. You MUST read the full content of this article. Your entire analysis depends on this step.
+2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language.
+3.  **GENERATE JSON REPORT**: Your final output MUST be only a single JSON object that strictly adheres to the following schema. Do not include any other text, conversation, or markdown formatting.
 
-**Your Task:**
-1.  **Fetch Content**: If a URL is provided, access it and retrieve the full article text. All subsequent steps depend on this.
-2.  **Analyze Content**: Analyze the article's structure, language, and claims.
-3.  **Fact-Check**: Use Google Search to fact-check specific claims against multiple reputable sources.
-4.  **Investigate Reputation**: Investigate the reputation of the publication and the author using search.
-5.  **Generate Report**: Generate a credibility report in JSON that matches the required schema. Do not add any conversational text or markdown formatting before or after the JSON object.
+\`\`\`json
+${JSON.stringify(cleanJsonSchema(jsonSchema))}
+\`\`\`
 
-The output must be in the language specified by the user: **${input.language}**.
+The output language must be: **${input.language}**.
 
 **Article Information for Analysis:**
 ${articleInfo}
 `;
-  
-  const result = await model.generateContent(prompt);
 
-  const responseText = result.response.text();
-  console.log("Raw response from Gemini model:", responseText);
+  const responseText = await callSonarWithSearch(prompt);
+  console.log("Raw response from Sonar model:", responseText);
+
+  // More robust JSON extraction
+  const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+  const jsonText = jsonMatch ? jsonMatch[1] : responseText;
 
   try {
-    return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
+    return NewsSleuthOutputSchema.parse(JSON.parse(jsonText));
   } catch (e) {
-    console.error("Failed to parse JSON response from model:", responseText);
-    throw new Error("Invalid response from Gemini model. Please try again.");
+    console.error("Failed to parse JSON response from model:", jsonText);
+    throw new Error("Invalid response from Sonar model. Please try again.");
   }
 }
