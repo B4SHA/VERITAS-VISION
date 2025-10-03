@@ -53,12 +53,23 @@ export async function newsSleuthAnalysis(
   try {
     const request: GenerateContentRequest = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        tools: [{googleSearch: {}}]
     };
 
     const result = await model.generateContent(request);
     
     const response = result.response;
     let responseText = response.text();
+    let sources: string[] = [];
+
+    const functionCalls = response.functionCalls();
+    if (functionCalls) {
+         for (const call of functionCalls) {
+            if (call.name === 'googleSearch') {
+                sources = call.args.results.map((r: any) => r.uri);
+            }
+        }
+    }
 
     // Sanitize the response to extract only the JSON part
     if (responseText.startsWith("```json")) {
@@ -77,6 +88,11 @@ export async function newsSleuthAnalysis(
             error: 'INVALID_JSON',
             details: 'The AI model returned an invalid JSON format. Please try again.',
         };
+    }
+    
+    // Add the sources to the output
+    if(sources.length > 0) {
+        output.sources = sources;
     }
     
     return output;
