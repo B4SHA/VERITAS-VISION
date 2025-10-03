@@ -2,6 +2,7 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
 
@@ -42,7 +43,7 @@ const newsSleuthPrompt = ai.definePrompt({
         })
     },
     output: { schema: NewsSleuthOutputSchema },
-    tools: ['googleSearch'], 
+    tools: [googleAI.search], 
     prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report. You must use the 'googleSearch' tool to find real-time information to ground your analysis.
 
 **Your Task:**
