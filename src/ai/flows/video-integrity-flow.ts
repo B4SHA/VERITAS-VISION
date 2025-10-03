@@ -79,9 +79,16 @@ Your final output MUST be only a single JSON object that strictly adheres to the
     });
 
     const response = result.response;
-    const text = response.text();
+    let text = response.text();
 
     try {
+        // Find the start and end of the JSON object
+        const startIndex = text.indexOf('{');
+        const endIndex = text.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+          text = text.substring(startIndex, endIndex + 1);
+        }
+
         const parsed = JSON.parse(text);
         return VideoIntegrityOutputSchema.parse(parsed);
     } catch (e) {
