@@ -71,7 +71,7 @@ You will perform the following analysis:
 3.  **Content Analysis & Web Search**:
     *   Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
     *   Based on the transcribed text, speakers, or key topics, use Google Search to find context. Look for fact-checks, news reports, or the original source of the audio.
-4.  **Verdict and Confidence**: Based on all available evidence (forensic and web search), provide a final verdict: 'Likely Authentic', 'Potential AI/Manipulation', or 'Uncertain'. Also, provide a confidence score (0-100) for your verdict.
+4.  **Verdict and Confidence**: Based on all available evidence (forensic and web search), provide a final verdict: 'Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'. Also, provide a confidence score (0-100) for your verdict.
 5.  **Reporting**: Generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
