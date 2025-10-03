@@ -36,7 +36,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const jsonSchema = zodToJsonSchema(ImageVerifierOutputSchema);
 
 const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash-preview",
+    model: "gemini-2.5-flash",
     generationConfig: {
         response_mime_type: "application/json",
         // @ts-ignore
