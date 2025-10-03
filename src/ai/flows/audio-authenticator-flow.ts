@@ -32,7 +32,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const jsonSchema = zodToJsonSchema(AudioAuthenticatorOutputSchema);
 
 const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
+    model: "gemini-2.5-flash-preview",
     generationConfig: {
         response_mime_type: "application/json",
         // @ts-ignore

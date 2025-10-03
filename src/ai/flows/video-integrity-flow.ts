@@ -39,7 +39,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const jsonSchema = zodToJsonSchema(VideoIntegrityOutputSchema);
 
 const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
+    model: "gemini-2.5-flash-preview",
     generationConfig: {
         response_mime_type: "application/json",
         // @ts-ignore
@@ -87,7 +87,7 @@ You will perform a multi-modal analysis:
     *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
 5.  **Overall Assessment**:
     *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
-    *   Determine if the video is likely a deepfake, manipulated, fully AI-generated, satire, or being used in a misleading context.
+    *   Determine if the video is a deepfake, manipulated, fully AI-generated, satire, or being used in a misleading context.
     *   Provide a confidence score for your overall analysis.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
