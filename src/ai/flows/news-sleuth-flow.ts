@@ -3,7 +3,7 @@
 /**
  * @fileOverview A news article credibility analysis AI agent.
  *
- * This file defines the server-side logic for the News Sleuth feature, which
+ * This file defines the server-side logic for the News Sleleuth feature, which
  * analyzes news articles for credibility using a Genkit flow.
  */
 
