@@ -1,9 +1,9 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
+import { dataUriToGenerativePart } from "@/lib/utils";
 
 const VideoIntegrityInputSchema = z.object({
   videoDataUri: z
@@ -31,21 +31,40 @@ const VideoIntegrityOutputSchema = z.object({
   }),
 });
 
-
 export type VideoIntegrityInput = z.infer<typeof VideoIntegrityInputSchema>;
 export type VideoIntegrityOutput = z.infer<typeof VideoIntegrityOutputSchema>;
 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: VideoIntegrityOutputSchema,
+    },
+    safetySettings: [
+        {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+    ],
+});
+
 export async function videoIntegrityAnalysis(input: VideoIntegrityInput): Promise<VideoIntegrityOutput> {
-  return videoIntegrityFlow(input);
-}
+    const videoPart = dataUriToGenerativePart(input.videoDataUri);
 
-
-const prompt = ai.definePrompt({
-    name: 'videoIntegrityPrompt',
-    input: { schema: VideoIntegrityInputSchema },
-    output: { schema: VideoIntegrityOutputSchema },
-    tools: [googleAI.search],
-    prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You can use the 'googleSearch' tool to find real-time information to ground your analysis.
+    const prompt = `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation. You have access to Google Search to find real-time information to ground your analysis.
 
 You will perform a multi-modal analysis:
 1.  **Visual Analysis**:
@@ -58,27 +77,23 @@ You will perform a multi-modal analysis:
     *   Transcribe any spoken words in the video.
     *   Analyze the transcribed text for misinformation, propaganda, or out-of-context statements.
 4.  **Contextual Web Search**:
-    *   Based on the visual content, transcribed text, and any identifiable people or locations, use the 'googleSearch' tool.
+    *   Based on the visual content, transcribed text, and any identifiable people or locations, use Google Search.
     *   Find news reports, fact-checks, or discussions related to this video to determine if it is being used in a misleading context.
 5.  **Overall Assessment**:
     *   Synthesize findings from all analyses (visual, audio, and web search) to form a holistic judgment.
     *   Determine if the video is likely a deepfake, manipulated, fully AI-generated, satire, or being used in a misleading context.
     *   Provide a confidence score for your overall analysis.
 
-The output language for the report and analysis must be in the language specified by the user: {{{language}}}.
+The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
-Video for analysis:
-{{media url=videoDataUri}}`,
-});
+Video for analysis is provided in the content.`;
 
-const videoIntegrityFlow = ai.defineFlow(
-  {
-    name: 'videoIntegrityFlow',
-    inputSchema: VideoIntegrityInputSchema,
-    outputSchema: VideoIntegrityOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    return output!;
-  }
-);
+    const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [videoPart, { text: prompt }] }],
+        // @ts-ignore
+        tools: [{ "google_search": {} }],
+    });
+
+    const responseText = result.response.text();
+    return VideoIntegrityOutputSchema.parse(JSON.parse(responseText));
+}

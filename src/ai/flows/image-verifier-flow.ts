@@ -1,9 +1,9 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { z } from 'zod';
+import { dataUriToGenerativePart } from "@/lib/utils";
 
 const ImageVerifierInputSchema = z.object({
   imageDataUri: z
@@ -28,43 +28,59 @@ const ImageVerifierOutputSchema = z.object({
     }).optional(),
 });
 
-
 export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
 export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 
-export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
-  return imageVerifierFlow(input);
-}
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: ImageVerifierOutputSchema,
+    },
+    safetySettings: [
+        {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+    ],
+});
 
-const prompt = ai.definePrompt({
-    name: 'imageVerifierPrompt',
-    input: { schema: ImageVerifierInputSchema },
-    output: { schema: ImageVerifierOutputSchema },
-    tools: [googleAI.search],
-    prompt: `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You can use the 'googleSearch' tool to find real-time information to ground your analysis.
+export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
+  const imagePart = dataUriToGenerativePart(input.imageDataUri);
+  
+  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
 
 You will perform the following analysis:
 1.  **AI Generation Detection**: Analyze the image for artifacts characteristic of AI image synthesis (e.g., GANs, diffusion models). Look for tell-tale signs in textures, backgrounds, lighting, and anatomical details.
 2.  **Manipulation Detection**: Look for evidence of digital alteration, such as cloning, splicing, or retouching. Analyze shadows, reflections, and perspectives for inconsistencies.
-3.  **Contextual Analysis (Web Search)**: Use the 'googleSearch' tool to perform a conceptual reverse image search. Determine the likely origin and context of the image. Is it being used out of context to spread misinformation? Find news articles, fact-checks, or other sources discussing the image.
+3.  **Contextual Analysis (Web Search)**: Use Google Search to perform a conceptual reverse image search. Determine the likely origin and context of the image. Is it being used out of context to spread misinformation? Find news articles, fact-checks, or other sources discussing the image.
 4.  **Text Analysis (OCR)**: If there is text in the image, extract it and analyze it for misinformation.
 5.  **Verdict and Confidence**: Provide a final verdict ('Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain') and a confidence score (0-100).
 6.  **Reporting**: Generate a comprehensive report detailing your findings, including the forensic methods used and the reasoning for your verdict based on both the image analysis and web search results.
 
-The output language for the report and analysis must be in the language specified by the user: {{{language}}}.
+The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
-Image for analysis:
-{{media url=imageDataUri}}`,
-});
+Image for analysis is provided in the content.`;
 
-const imageVerifierFlow = ai.defineFlow(
-  {
-    name: 'imageVerifierFlow',
-    inputSchema: ImageVerifierInputSchema,
-    outputSchema: ImageVerifierOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    return output!;
-  }
-);
+  const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
+      // @ts-ignore
+      tools: [{ "google_search": {} }],
+  });
+
+  const responseText = result.response.text();
+  return ImageVerifierOutputSchema.parse(JSON.parse(responseText));
+}

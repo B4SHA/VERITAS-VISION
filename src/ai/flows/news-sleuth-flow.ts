@@ -1,10 +1,8 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, FunctionDeclarationSchemaType } from "@google/generative-ai";
 import { z } from 'zod';
-
 
 const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
@@ -28,48 +26,64 @@ const NewsSleuthOutputSchema = z.object({
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-    return newsSleuthFlow(input);
-}
+const fetchUrlTool = {
+    "function_declarations": [
+        {
+            "name": "fetchUrl",
+            "description": "Fetches the text content of a publicly accessible web page URL.",
+            "parameters": {
+                "type": FunctionDeclarationSchemaType.OBJECT,
+                "properties": {
+                    "url": { "type": FunctionDeclarationSchemaType.STRING, "description": "The full URL of the page to fetch." },
+                },
+                "required": ["url"],
+            }
+        }
+    ]
+};
 
-
-const newsSleuthPrompt = ai.definePrompt({
-    name: 'newsSleuthPrompt',
-    input: {
-        schema: z.object({
-            articleInfo: z.string(), 
-            language: z.string(),
-        })
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: NewsSleuthOutputSchema,
     },
-    output: { schema: NewsSleuthOutputSchema },
-    tools: [googleAI.search], 
-    prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report. You must use the 'googleSearch' tool to find real-time information to ground your analysis.
-
-**Your Task:**
-1.  **Gather Information:**
-    * The provided \`articleInfo\` may contain a URL, a headline, or the full text.
-    * Use the 'googleSearch' tool to find corroborating and contradictory reports from various, diverse, and reputable sources.
-2.  **Analyze the Content:** Assess the article's structure, language, and claims.
-3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search capabilities.
-4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
-5.  **Generate Credibility Report:** Fill out the JSON structure completely, ensuring all fields are present.
-
-The output language for the report must be in the language specified by the user: **{{{language}}}**.
-
-**Article Information for Analysis:**
-{{{articleInfo}}}
-`,
+    safetySettings: [
+        {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+        {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+        },
+    ],
+    // @ts-ignore
+    tools: [fetchUrlTool, { "google_search": {} }],
 });
 
+async function fetchUrl(url: string): Promise<string> {
+    try {
+        const response = await fetch(url);
+        const text = await response.text();
+        return `(Simulated Scrape) Content from ${url}. First 200 chars: ${text.substring(0, 200)}...`;
+    } catch (e) {
+        console.error('Fetch failed:', e);
+        return `Failed to fetch URL: ${url}.`;
+    }
+}
 
-const newsSleuthFlow = ai.defineFlow(
-  {
-    name: 'newsSleuthFlow',
-    inputSchema: NewsSleuthInputSchema,
-    outputSchema: NewsSleuthOutputSchema,
-  },
-  async (input) => {
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
     let articleInfo = '';
     if (input.articleText) {
         articleInfo += `Full Article Text:\n---\n${input.articleText}\n---\n`;
@@ -78,14 +92,51 @@ const newsSleuthFlow = ai.defineFlow(
         articleInfo += `Headline: "${input.articleHeadline}"\n`;
     }
     if (input.articleUrl) {
-        articleInfo += `Article URL (for context and search): ${input.articleUrl}\n\n`;
+        articleInfo += `**PRIMARY URL TO FETCH**: ${input.articleUrl}\n\n`;
     }
 
-    const { output } = await newsSleuthPrompt({ 
-        articleInfo: articleInfo, 
-        language: input.language 
-    });
+    const prompt = `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
 
-    return output!;
-  }
-);
+**Your Task:**
+1.  **Gather Information:**
+    * The provided \`articleInfo\` may contain a URL, a headline, or the full text. If a URL is present, you **MUST** use the \`fetchUrl\` tool to get the content.
+    * You **MUST** use Google Search to find corroborating and contradictory reports from various, diverse, and reputable sources.
+2.  **Analyze the Content:** Assess the article's structure, language, and claims.
+3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search.
+4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
+5.  **Generate Credibility Report:** Fill out the JSON structure completely, ensuring all fields are present.
+
+The output language for the report must be in the language specified by the user: **${input.language}**.
+
+**Article Information for Analysis:**
+${articleInfo}
+`;
+    
+    const chat = model.startChat();
+    const result = await chat.sendMessage(prompt);
+    let response = result.response;
+
+    const functionCalls = response.functionCalls();
+
+    if (functionCalls && functionCalls.length > 0) {
+        const call = functionCalls[0];
+        if (call.name === 'fetchUrl') {
+            const url = call.args.url;
+            const content = await fetchUrl(url);
+            const result2 = await chat.sendMessage(
+                [
+                    {
+                        functionResponse: {
+                            name: 'fetchUrl',
+                            response: { name: 'fetchUrl', content: content },
+                        },
+                    },
+                ]
+            );
+            response = result2.response;
+        }
+    }
+    
+    const responseText = response.text();
+    return NewsSleuthOutputSchema.parse(JSON.parse(responseText));
+}
