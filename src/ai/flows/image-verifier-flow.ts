@@ -38,11 +38,11 @@ export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
 export async function imageVerifierAnalysis(input: ImageVerifierInput): Promise<ImageVerifierOutput> {
   const imagePart = dataUriToGenerativePart(input.imageDataUri);
 
-  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context. You have access to Google Search to find real-time information to ground your analysis.
+  const prompt = `You are an expert digital image forensics analyst. Your task is to analyze an image to determine its authenticity and detect any signs of AI generation, digital manipulation, or misleading context.
 
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the image for artifacts characteristic of AI image synthesis (GANs, diffusion models), manipulation (e.g., cloning, splicing), and inconsistencies in shadows, reflections, or perspectives.
-2.  **Contextual Analysis (Web Search)**: Use Google Search to perform a conceptual reverse image search. Determine the likely origin and context of the image. Find news articles, fact-checks, or other sources discussing the image.
+2.  **Contextual Analysis**: Determine the likely origin and context of the image based on visual cues.
 3.  **Text Analysis (OCR)**: If there is text in the image, extract it and include it in the 'detectedText' field.
 4.  **Verdict, Confidence, and Report**: Provide a final verdict ('Likely Authentic', 'Likely AI-Generated/Manipulated', 'Uncertain'), a confidence score (0-100), and a comprehensive report detailing your findings from all analysis steps.
 
@@ -54,7 +54,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
 
   const result = await model.generateContent({
       contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }],
-      tools: [{ "google_search": {} }],
   });
 
   const response = result.response;

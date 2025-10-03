@@ -37,15 +37,13 @@ export type AudioAuthenticatorOutput = z.infer<typeof AudioAuthenticatorOutputSc
 export async function audioAuthenticatorAnalysis(input: AudioAuthenticatorInput): Promise<AudioAuthenticatorOutput> {
   const audioPart = dataUriToGenerativePart(input.audioDataUri);
 
-  const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
+  const prompt = `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery.
 
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
 2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it and include it in the 'detectedText' field.
-3.  **Content Analysis & Web Search**:
-    *   Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
-    *   Based on the transcribed text, speakers, or key topics, use Google Search to find context. Look for fact-checks, news reports, or the original source of the audio.
-4.  **Verdict, Confidence, and Report**: Based on all available evidence (forensic and web search), provide a final verdict ('Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'), a confidence score (0-100), and generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
+3.  **Content Analysis**: Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
+4.  **Verdict, Confidence, and Report**: Based on all available evidence, provide a final verdict ('Likely Authentic', 'Potential AI/Manipulation', 'Uncertain'), a confidence score (0-100), and generate a comprehensive report detailing your findings and the reasoning for your verdict.
 
 The output language for the report and analysis must be in the language specified by the user: ${input.language}.
 
@@ -55,7 +53,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
 
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [audioPart, { text: prompt }] }],
-        tools: [{ "google_search": {} }],
     });
 
     const response = result.response;

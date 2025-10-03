@@ -47,12 +47,11 @@ export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSl
     articleInfo += `**You MUST fetch and analyze the content from this primary URL using your web search tool**: ${input.articleUrl}\n\n`;
   }
 
-  const prompt = `You are an expert investigative journalist AI. Your primary task is to fetch the content from the provided URL (if available), analyze it, and then generate a credibility report. You have access to Google Search to find real-time information and access URLs.
+  const prompt = `You are an expert investigative journalist AI. Your primary task is to analyze the provided article content and generate a credibility report.
 
 **Instructions:**
-1.  **FETCH CONTENT**: If a URL is provided in the "Article Information for Analysis" section, you MUST access it using your search tool to read the full content of the article. Your entire analysis depends on this step. If only text or a headline is provided, use that.
-2.  **ANALYZE**: Based on the fetched content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language (sensationalism, logical fallacies).
-3.  **GENERATE JSON REPORT**: The output language must be: **${input.language}**.
+1.  **ANALYZE**: Based on the provided content, perform a detailed analysis. Check facts, identify the author and publication, and look for biases or manipulative language (sensationalism, logical fallacies).
+2.  **GENERATE JSON REPORT**: The output language must be: **${input.language}**.
 
 Article Information for Analysis:
 ${articleInfo}
@@ -61,7 +60,6 @@ Your final output MUST be only a single JSON object that strictly adheres to the
 
     const result = await model.generateContent({
         contents: [{ role: 'user', parts: [{text: prompt}] }],
-        tools: [{ "google_search": {} }],
     });
 
     const response = result.response;
