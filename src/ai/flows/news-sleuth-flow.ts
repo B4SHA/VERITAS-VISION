@@ -42,15 +42,19 @@ const newsSleuthPrompt = ai.definePrompt({
         })
     },
     output: { schema: NewsSleuthOutputSchema },
-    tools: ['googleSearch'], 
-    prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report, grounded in real-time web search results.
+    config: {
+      retrieval: {
+        tool: 'googleSearch',
+      },
+    }, 
+    prompt: `You are a world-class investigative journalist and fact-checker AI, known as "News Sleuth." Your mission is to analyze a news article based on the provided information and deliver a comprehensive credibility report. You have access to real-time information from Google Search to ground your analysis.
 
 **Your Task:**
 1.  **Gather Information:**
     * The provided \`articleInfo\` may contain a URL, a headline, or the full text.
-    * You **MUST** use the \`googleSearch\` tool to find corroborating and contradictory reports from various, diverse, and reputable sources.
+    * Use your access to Google Search to find corroborating and contradictory reports from various, diverse, and reputable sources.
 2.  **Analyze the Content:** Assess the article's structure, language, and claims.
-3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via \`googleSearch\`.
+3.  **Fact-Check Claims:** Cross-reference all claims with evidence found via your search capabilities.
 4.  **Source & Author Analysis:** Investigate the reputation of the publication and the author.
 5.  **Generate Credibility Report:** Fill out the JSON structure completely, ensuring all fields are present.
 
@@ -77,7 +81,7 @@ const newsSleuthFlow = ai.defineFlow(
         articleInfo += `Headline: "${input.articleHeadline}"\n`;
     }
     if (input.articleUrl) {
-        articleInfo += `Article URL (for context, do not fetch): ${input.articleUrl}\n\n`;
+        articleInfo += `Article URL (for context and search): ${input.articleUrl}\n\n`;
     }
 
     const { output } = await newsSleuthPrompt({ 

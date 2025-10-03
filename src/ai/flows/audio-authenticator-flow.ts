@@ -34,15 +34,19 @@ const prompt = ai.definePrompt({
     name: 'audioAuthenticatorPrompt',
     input: { schema: AudioAuthenticatorInputSchema },
     output: { schema: AudioAuthenticatorOutputSchema },
-    tools: ['googleSearch'],
-    prompt: `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery, grounded in real-time web search results.
+    config: {
+      retrieval: {
+        tool: 'googleSearch',
+      },
+    },
+    prompt: `You are an expert audio forensics analyst. Your task is to analyze an audio file to determine its authenticity and detect any signs of AI generation, manipulation, or deepfakery. You have access to Google Search to find real-time information to ground your analysis.
 
 You will perform the following analysis:
 1.  **Forensic Analysis**: Analyze the audio for artifacts commonly associated with AI synthesis or manipulation. This includes examining background noise consistency, speaker tone and cadence, unnatural pauses, frequency spectrum anomalies, and other digital fingerprints.
 2.  **Speech-to-Text (if applicable)**: If the audio contains speech, transcribe it.
 3.  **Content Analysis & Web Search**:
     *   Analyze the transcribed text for signs of misinformation, propaganda, or unusual phrasing.
-    *   You MUST use the provided Google Search tool based on the transcribed text, speakers, or key topics to find context. Look for fact-checks, news reports, or the original source of the audio.
+    *   Based on the transcribed text, speakers, or key topics, use your access to Google Search to find context. Look for fact-checks, news reports, or the original source of the audio.
 4.  **Verdict and Confidence**: Based on all available evidence (forensic and web search), provide a final verdict: 'Likely Authentic', 'Potential AI/Manipulation', or 'Uncertain'. Also, provide a confidence score (0-100) for your verdict.
 5.  **Reporting**: Generate a comprehensive report detailing your findings and the reasoning for your verdict. Integrate information from your web search to provide context.
 
