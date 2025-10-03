@@ -54,11 +54,9 @@ const newsSleuthFlow = ai.defineFlow(
   async (input) => {
     const { output } = await ai.generate({
       model: googleAI.model('gemini-2.5-flash'),
-      prompt: {
-        text: newsSleuthPrompt,
-        input: input,
-      },
-      tools: [{tool: 'googleSearch'}],
+      prompt: newsSleuthPrompt,
+      input,
+      tools: ['googleSearch'],
       output: {
         schema: NewsSleuthOutputSchema,
       }
