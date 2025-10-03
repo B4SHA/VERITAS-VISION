@@ -87,7 +87,7 @@ export const VideoIntegrityOutputSchema = z.object({
   deepfake: z.string().describe("Analysis of deepfake elements (e.g., face swapping). State 'Detected' or 'Not Detected' and explain why."),
   videoManipulation: z.string().describe("Analysis of general video manipulations (CGI, edits). State 'Detected' or 'Not Detected' and explain why."),
   syntheticVoice: z.string().describe("Analysis of voice cloning or synthetic speech. State 'Detected' or 'Not Detected' and explain why."),
-  reasoning: zstring().describe('The reasoning behind the overall verdict and score.'),
+  reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
   detectedText: z.string().optional().describe("Transcribed text from the video's audio track, if any. If none, this should be null."),
 });
 
