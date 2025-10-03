@@ -22,7 +22,20 @@ const prompt = ai.definePrompt({
     model: googleAI.model('gemini-2.5-flash'),
     input: { schema: NewsSleuthInputSchema },
     output: { schema: NewsSleuthOutputSchema },
-    prompt: `You are an advanced reasoning engine for detecting fake news. Generate a credibility report in {{language}}.
+    prompt: `You are an advanced reasoning engine for detecting fake news. Analyze the provided article content and generate a credibility report in {{language}}.
+
+{{#if articleUrl}}
+Article URL: {{articleUrl}}
+{{/if}}
+{{#if articleText}}
+Article Text:
+---
+{{articleText}}
+---
+{{/if}}
+{{#if articleHeadline}}
+Article Headline: {{articleHeadline}}
+{{/if}}
 
 Your JSON output must include these fields:
 - overallScore: A credibility score from 0-100.
@@ -31,7 +44,7 @@ Your JSON output must include these fields:
 - biases: An analysis of any detected biases (e.g., political, commercial).
 - flaggedContent: A list of specific issues found (e.g., sensationalism, logical fallacies).
 - reasoning: The reasoning behind the overall verdict and score.
-- sources: A list of URLs used to corroborate facts. This MUST be populated from the search results.
+- sources: A list of URLs used to corroborate facts. This MUST be populated from your internal knowledge and analysis.
 `,
 });
 
