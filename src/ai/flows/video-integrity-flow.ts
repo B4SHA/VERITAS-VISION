@@ -2,7 +2,6 @@
 'use server';
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 
 const VideoIntegrityInputSchema = z.object({
@@ -44,7 +43,7 @@ const prompt = ai.definePrompt({
     name: 'videoIntegrityPrompt',
     input: { schema: VideoIntegrityInputSchema },
     output: { schema: VideoIntegrityOutputSchema },
-    tools: [googleAI.tool('search')],
+    tools: ['googleSearch'],
     prompt: `You are an expert multimedia forensics AI specializing in video integrity. Your task is to analyze a video file to detect signs of deepfakery, manipulation, and misinformation, grounded in real-time web search results.
 
 You will perform a multi-modal analysis:
