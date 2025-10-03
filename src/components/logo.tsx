@@ -28,7 +28,7 @@ export function Logo({ full = false }: { full?: boolean }) {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="text-xl font-bold font-headline text-sidebar-foreground">
+      <span className="text-xl font-bold font-headline text-sidebar-foreground group-data-[collapsible=icon]:hidden">
         {full ? t('app_title_long') : t('app_title_short')}
       </span>
     </div>

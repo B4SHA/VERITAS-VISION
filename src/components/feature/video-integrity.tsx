@@ -35,9 +35,9 @@ export function VideoIntegrity() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <Card>
+      <Card className="bg-card">
         <CardHeader>
-          <CardTitle className="font-headline">{t('video_integrity_title')}</CardTitle>
+          <CardTitle className="font-headline text-3xl">{t('video_integrity_title')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <FileUploader
@@ -45,7 +45,7 @@ export function VideoIntegrity() {
             acceptedMimeTypes={["video/mp4", "video/webm", "video/mov"]}
             fileType="video"
           />
-          <Button onClick={handleAnalyze} disabled={isLoading || !videoDataUri} className="w-full">
+          <Button onClick={handleAnalyze} disabled={isLoading || !videoDataUri} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {t('analyze')}
           </Button>
@@ -62,7 +62,7 @@ export function VideoIntegrity() {
 function LoadingState() {
   const { t } = useLanguage();
   return (
-    <Card>
+    <Card className="bg-card">
       <CardHeader>
         <CardTitle className="font-headline">{t('analysis_report')}</CardTitle>
       </CardHeader>
@@ -90,7 +90,7 @@ function AnalysisResult({ result }: { result: AnalyzeVideoIntegrityOutput }) {
   const { t } = useLanguage();
 
   return (
-    <Card>
+    <Card className="bg-card">
       <CardHeader>
         <CardTitle className="font-headline">{t('analysis_report')}</CardTitle>
       </CardHeader>
