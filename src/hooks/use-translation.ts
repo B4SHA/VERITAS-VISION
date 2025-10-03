@@ -27,6 +27,11 @@ export function useTranslation() {
 
   const t = (key: string) => getTranslatedValue(language, key);
 
+  const getFeatures = () => {
+    const features = translations.home[language]?.features || translations.home['en'].features;
+    return features as Array<{title: string, description: string, featureList: string[]}>;
+  }
+
   const navigationLinks = [
     { href: '/news-sleuth', name: t('navigation.newsSleuth') },
     { href: '/video-integrity', name: t('navigation.videoIntegrity') },
@@ -34,5 +39,5 @@ export function useTranslation() {
     { href: '/image-verifier', name: t('navigation.imageVerifier') },
   ];
 
-  return { t, navigationLinks };
+  return { t, navigationLinks, getFeatures };
 }

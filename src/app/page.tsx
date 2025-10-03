@@ -20,9 +20,9 @@ const sectionVariants = {
 };
 
 export default function Home() {
-  const { t } = useTranslation();
+  const { t, getFeatures } = useTranslation();
 
-  const features = t('home.features') as Array<{title: string, description: string, featureList: string[]}>;
+  const features = getFeatures();
 
   const tryNowFeatures = [
     {
