@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useMemo } from 'react';
-import { translations as allTranslations } from '@/data/translations';
+import { translations } from '@/data/translations';
 
 export type Language = 'en' | 'hi' | 'bn' | 'mr' | 'te' | 'ta';
 
@@ -17,15 +17,19 @@ export const languages: { value: Language; label: string }[] = [
 
 function getTranslatedValue(language: string, key: string) {
     const keyParts = key.split('.');
-    let currentObject: any = allTranslations;
+    let currentObject: any = translations;
 
     for (const part of keyParts) {
         if (currentObject[part] === undefined) {
+            // Fallback for top-level keys
+            if (translations[key] && translations[key][language]) {
+                return translations[key][language];
+            }
             return key; // Key not found
         }
         currentObject = currentObject[part];
     }
-
+    
     if (typeof currentObject === 'object' && currentObject !== null && currentObject[language] !== undefined) {
         // This handles keys that point to an object with language variants, like "home.heroTitle"
         return currentObject[language];
@@ -42,7 +46,7 @@ function getTranslatedValue(language: string, key: string) {
 interface LanguageContextType {
   language: Language;
   setLanguage: (language: Language) => void;
-  t: (key: string) => string;
+  t: (key: string) => any;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -50,7 +54,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>('en');
 
-  const t = useMemo(() => (key: string): string => {
+  const t = useMemo(() => (key: string): any => {
     return getTranslatedValue(language, key);
   }, [language]);
 

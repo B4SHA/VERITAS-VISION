@@ -5,8 +5,8 @@ import { translations } from '@/data/translations';
 export function useTranslation() {
   const { language, t } = useLanguage();
 
-  const getFeatures = () => {
-    return translations['home'][language].features as Array<{title: string, description: string, featureList: string[]}>;
+  const getFeatures = (): Array<{title: string, description: string, featureList: string[]}> => {
+    return translations['home'][language]?.features || [];
   }
 
   const navigationLinks = [
