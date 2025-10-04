@@ -80,11 +80,11 @@ const prompt = ai.definePrompt({
   output: { schema: NewsSleuthOutputSchema },
   prompt: `You are an expert fake news detector. 
 Your job is to:
-1. Analyze the article content. If a URL is provided, use the getArticleContentFromUrl tool first. If that fails, base your report on the error.
+1. Analyze the article content. If a URL is provided, you MUST use the getArticleContentFromUrl tool first. If the tool returns an error, your report should state that the content could not be fetched and why.
 2. Identify the major claims in the article.
 3. For each major claim, use the "webSearch" tool to find corroborating or contradicting evidence.
 4. Generate a credibility report.
-5. In your reasoning, ONLY cite sources that come directly from the webSearch tool results. Do not invent or assume fact-checks if none were found. If the search tool returns no results, state that you could not find sufficient evidence to confirm or deny the claims and grade credibility as 'Uncertain'.
+5. In your reasoning, ONLY cite sources that come directly from the webSearch tool results. Do not invent or assume fact-checks if none were found. If the search tool returns no results or an error, state that you could not find sufficient evidence to confirm or deny the claims and grade credibility as 'Uncertain'.
 
 Your report must include:
    - Overall credibility score (0-100).
