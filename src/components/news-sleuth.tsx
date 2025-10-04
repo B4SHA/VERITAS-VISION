@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
@@ -357,12 +357,14 @@ export function NewsSleuth() {
                           <p className="text-sm text-muted-foreground">{report.reasoning}</p>
                         </AccordionContent>
                       </AccordionItem>
-                      <AccordionItem value="biases">
-                        <AccordionTrigger>Bias Analysis</AccordionTrigger>
-                        <AccordionContent>
-                          <p className="text-sm text-muted-foreground">{report.biases}</p>
-                        </AccordionContent>
-                      </AccordionItem>
+                      {report.biases && (
+                        <AccordionItem value="biases">
+                            <AccordionTrigger>Bias Analysis</AccordionTrigger>
+                            <AccordionContent>
+                                <p className="text-sm text-muted-foreground">{report.biases}</p>
+                            </AccordionContent>
+                        </AccordionItem>
+                      )}
                       {report.flaggedContent && report.flaggedContent.length > 0 && (
                         <AccordionItem value="flagged-content">
                             <AccordionTrigger>Flagged Content</AccordionTrigger>
@@ -400,5 +402,3 @@ export function NewsSleuth() {
     </div>
   );
 }
-
-    
