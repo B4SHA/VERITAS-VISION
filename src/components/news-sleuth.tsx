@@ -350,7 +350,7 @@ export function NewsSleuth() {
                         </CardContent>
                     </Card>
 
-                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content', 'sources-checked']} className="w-full">
+                    <Accordion type="multiple" defaultValue={['reasoning']} className="w-full">
                       <AccordionItem value="reasoning">
                         <AccordionTrigger>Reasoning</AccordionTrigger>
                         <AccordionContent>
