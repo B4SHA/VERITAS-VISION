@@ -26,7 +26,7 @@ async function runNewsSleuthAnalysis(
   
   // Use a model that supports tool use
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash-latest',
+    model: 'gemini-2.5-flash',
     tools: [{
         googleSearch: {},
     }],
@@ -65,6 +65,24 @@ async function runNewsSleuthAnalysis(
   try {
     const result = await model.generateContent(prompt);
     const response = result.response;
+    
+    // Extract sources from function calls first
+    const functionCalls = response.functionCalls();
+    const sources: string[] = [];
+    if (functionCalls && functionCalls.length > 0) {
+        for (const call of functionCalls) {
+            // The tool name is not always 'googleSearch', so we check for 'tool_code' which is more generic
+            const searchResults = call.args?.results || call.args?.tool_code?.results;
+            if (searchResults) {
+                for (const res of searchResults) {
+                    if (res.url) {
+                        sources.push(res.url);
+                    }
+                }
+            }
+        }
+    }
+
     let responseText = response.text();
     
     // Extract JSON from the response text
@@ -94,21 +112,6 @@ async function runNewsSleuthAnalysis(
     }
     
     const output = validation.data;
-
-    // Extract sources from function calls
-    const functionCalls = response.functionCalls();
-    const sources: string[] = [];
-    if (functionCalls && functionCalls.length > 0) {
-        for (const call of functionCalls) {
-            if (call.name === 'googleSearch' && call.args && call.args.results) {
-                for (const result of call.args.results) {
-                    if (result.url) {
-                        sources.push(result.url);
-                    }
-                }
-            }
-        }
-    }
     output.sources = sources;
 
     return output;
