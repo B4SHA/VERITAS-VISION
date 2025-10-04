@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
@@ -347,12 +347,18 @@ export function NewsSleuth() {
                               </div>
                           </CardHeader>
                           <CardContent>
-                              <div className="flex items-baseline gap-4">
-                                <span className="font-bold text-5xl text-primary">{report.overall_credibility_score.score.toFixed(1)}</span>
-                                <span className="text-muted-foreground text-lg">/ 5.0</span>
-                              </div>
-                              <Progress value={getProgressValue(report.overall_credibility_score.score)} indicatorClassName={getProgressIndicatorClassName(report.overall_credibility_score.score)} className="my-3"/>
-                              <p className="text-sm text-muted-foreground">{report.overall_credibility_score.reasoning}</p>
+                            {typeof report.overall_credibility_score.score === 'number' && (
+                              <>
+                                <div className="flex items-baseline gap-4">
+                                  <span className="font-bold text-5xl text-primary">{report.overall_credibility_score.score.toFixed(1)}</span>
+                                  <span className="text-muted-foreground text-lg">/ 5.0</span>
+                                </div>
+                                <Progress value={getProgressValue(report.overall_credibility_score.score)} indicatorClassName={getProgressIndicatorClassName(report.overall_credibility_score.score)} className="my-3"/>
+                              </>
+                            )}
+                            {report.overall_credibility_score.reasoning && (
+                                <p className="text-sm text-muted-foreground">{report.overall_credibility_score.reasoning}</p>
+                            )}
                           </CardContent>
                       </Card>
                     )}
@@ -415,3 +421,5 @@ export function NewsSleuth() {
     </div>
   );
 }
+
+    
