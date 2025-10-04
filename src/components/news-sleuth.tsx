@@ -350,13 +350,14 @@ export function NewsSleuth() {
                         </CardContent>
                     </Card>
 
-                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content', 'sources-checked']} className="w-full">
+                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content', 'sources']} className="w-full">
                       <AccordionItem value="reasoning">
                         <AccordionTrigger>Reasoning</AccordionTrigger>
                         <AccordionContent>
                           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{report.reasoning}</p>
                         </AccordionContent>
                       </AccordionItem>
+                      
                       {report.biases && (
                         <AccordionItem value="biases">
                             <AccordionTrigger>Bias Analysis</AccordionTrigger>
@@ -365,6 +366,7 @@ export function NewsSleuth() {
                             </AccordionContent>
                         </AccordionItem>
                       )}
+
                       {report.flaggedContent && report.flaggedContent.length > 0 && (
                         <AccordionItem value="flagged-content">
                             <AccordionTrigger>Flagged Content</AccordionTrigger>
@@ -375,8 +377,9 @@ export function NewsSleuth() {
                             </AccordionContent>
                         </AccordionItem>
                       )}
+
                       {report.sources && report.sources.length > 0 && (
-                        <AccordionItem value="sources-checked">
+                        <AccordionItem value="sources">
                             <AccordionTrigger>Sources Checked</AccordionTrigger>
                             <AccordionContent>
                                 <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
@@ -402,3 +405,5 @@ export function NewsSleuth() {
     </div>
   );
 }
+
+    
