@@ -339,6 +339,7 @@ export function NewsSleuth() {
               {report && (
                  <ScrollArea className="h-full pr-4">
                   <div className="space-y-6">
+                    {report.overall_credibility_score && (
                       <Card>
                           <CardHeader>
                               <div className="flex justify-between items-center">
@@ -354,27 +355,33 @@ export function NewsSleuth() {
                               <p className="text-sm text-muted-foreground">{report.overall_credibility_score.reasoning}</p>
                           </CardContent>
                       </Card>
+                    )}
 
+                    {report.article_details && (
                       <div className="space-y-2">
                         <h3 className="text-lg font-semibold">{report.article_details.title}</h3>
                         <p className="text-sm text-muted-foreground italic">
                             <strong>Main Claim:</strong> {report.article_details.main_claim}
                         </p>
                       </div>
+                    )}
 
+                    {report.analysis && (
                       <Accordion type="multiple" defaultValue={['factual-accuracy', 'source-reliability', 'bias-manipulation', 'recommendations', 'sources']} className="w-full">
-                        <AnalysisSection title="Factual Accuracy" data={report.analysis.factual_accuracy.supporting_points} assessment={report.analysis.factual_accuracy.assessment} />
-                        <AnalysisSection title="Source Reliability" data={report.analysis.source_reliability.supporting_points} assessment={report.analysis.source_reliability.assessment} />
-                        <AnalysisSection title="Bias & Manipulation" data={report.analysis.bias_manipulation.supporting_points} assessment={report.analysis.bias_manipulation.assessment} />
+                        {report.analysis.factual_accuracy && <AnalysisSection title="Factual Accuracy" data={report.analysis.factual_accuracy.supporting_points} assessment={report.analysis.factual_accuracy.assessment} />}
+                        {report.analysis.source_reliability && <AnalysisSection title="Source Reliability" data={report.analysis.source_reliability.supporting_points} assessment={report.analysis.source_reliability.assessment} />}
+                        {report.analysis.bias_manipulation && <AnalysisSection title="Bias & Manipulation" data={report.analysis.bias_manipulation.supporting_points} assessment={report.analysis.bias_manipulation.assessment} />}
                         
-                        <AccordionItem value="recommendations">
-                            <AccordionTrigger>Recommendations</AccordionTrigger>
-                            <AccordionContent>
-                                <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                    {report.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
-                                </ul>
-                            </AccordionContent>
-                        </AccordionItem>
+                        {report.recommendations && (
+                          <AccordionItem value="recommendations">
+                              <AccordionTrigger>Recommendations</AccordionTrigger>
+                              <AccordionContent>
+                                  <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                                      {report.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                                  </ul>
+                              </AccordionContent>
+                          </AccordionItem>
+                        )}
 
                         {report.sources && report.sources.length > 0 && (
                           <AccordionItem value="sources">
@@ -397,6 +404,7 @@ export function NewsSleuth() {
                           </AccordionItem>
                         )}
                       </Accordion>
+                    )}
                   </div>
                 </ScrollArea>
               )}
@@ -407,4 +415,3 @@ export function NewsSleuth() {
     </div>
   );
 }
-
