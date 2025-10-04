@@ -1,7 +1,13 @@
 
 import { z } from 'zod';
 
-// News Sleuth Schemas
+// A more detailed analysis structure
+const AnalysisDetailSchema = z.object({
+  assessment: z.string().describe("Overall judgment (e.g., 'Low', 'High', 'Speculative')."),
+  supporting_points: z.array(z.string()).describe("3-5 bullet points confirming or refuting the facts based on search grounding."),
+});
+
+// News Sleuth Schemas (Updated based on example)
 export const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),
   articleUrl: z.string().optional().describe('The URL of the news article to be fetched and analyzed.'),
@@ -10,14 +16,24 @@ export const NewsSleuthInputSchema = z.object({
 });
 
 export const NewsSleuthOutputSchema = z.object({
-  overallScore: z.number().describe('A credibility score from 0-100.'),
-  verdict: z.string().describe("The final judgment on the article's credibility (e.g., 'Likely Real', 'Likely Fake', 'Uncertain')."),
-  summary: z.string().describe("A brief summary of the article's main points and the analysis findings."),
-  biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
-  flaggedContent: z.array(z.string()).describe('A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims.'),
-  reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  sources: z.array(z.string()).optional().describe('A list of URLs used to corroborate facts. This is populated from search results.'),
+    report_title: z.string().describe("A concise title for the credibility report."),
+    article_details: z.object({
+        title: z.string().describe("The exact title of the article being analyzed."),
+        main_claim: z.string().describe("The single, most important claim made in the article."),
+    }),
+    analysis: z.object({
+        factual_accuracy: AnalysisDetailSchema,
+        source_reliability: AnalysisDetailSchema,
+        bias_manipulation: AnalysisDetailSchema,
+    }),
+    overall_credibility_score: z.object({
+        score: z.number().describe("A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number."),
+        reasoning: z.string().describe("A concise paragraph justifying the final score based on the analysis."),
+    }),
+    recommendations: z.array(z.string()).describe("3 practical recommendations for the reader (e.g., 'Verify with official sources.')."),
+    sources: z.array(z.string()).optional().describe('A list of URLs used to corroborate facts. This is populated from search results.'),
 });
+
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;

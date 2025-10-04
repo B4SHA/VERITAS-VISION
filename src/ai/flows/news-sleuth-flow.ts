@@ -1,144 +1,187 @@
 
 'use server';
 /**
- * @fileOverview A news article credibility analysis AI agent.
+ * @fileOverview A news article credibility analysis AI agent using structured output.
  *
- * This file defines the server-side logic for the News Sleuth feature, which
- * analyzes news articles for credibility using a multi-step prompting strategy.
+ * This file defines the server-side logic for generating a news credibility report
+ * via a single, highly constrained Gemini API call, ensuring reliable JSON output
+ * and using Google Search grounding for fact-checking.
  */
-
 import {
   GoogleGenerativeAI,
 } from '@google/generative-ai';
-import {
-  NewsSleuthOutputSchema,
-  type NewsSleuthInput,
-  type NewsSleuthOutput,
-  type NewsSleuthError,
+
+import type {
+  NewsSleuthInput,
+  NewsSleuthOutput,
+  NewsSleuthError,
 } from '@/ai/schemas';
 
-async function runNewsSleuthAnalysis(
-  input: NewsSleuthInput
-): Promise<NewsSleuthOutput | NewsSleuthError> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', tools: [{googleSearch: {}}] });
+// --- JSON Schema for Structured Output ---
+const CREDIBILITY_REPORT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    report_title: { "type": "STRING", "description": "A concise title for the credibility report." },
+    article_details: {
+      "type": "OBJECT",
+      "properties": {
+        "title": { "type": "STRING", "description": "The exact title of the article being analyzed." },
+        "main_claim": { "type": "STRING", "description": "The single, most important claim made in the article." }
+      },
+      "required": ["title", "main_claim"]
+    },
+    analysis: {
+      "type": "OBJECT",
+      "properties": {
+        "factual_accuracy": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Low', 'High', 'Speculative')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points confirming or refuting the facts based on search grounding." }
+          },
+          "required": ["assessment", "supporting_points"]
+        },
+        "source_reliability": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Verifiable', 'Anonymous', 'Social Media Rumor')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points analyzing the article's sources and citing the search results." }
+          },
+          "required": ["assessment", "supporting_points"]
+        },
+        "bias_manipulation": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Clickbait', 'Neutral', 'Sensationalist')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points on biased language, tone, or cherry-picking of facts." }
+          },
+          "required": ["assessment", "supporting_points"]
+        }
+      },
+      "required": ["factual_accuracy", "source_reliability", "bias_manipulation"]
+    },
+    overall_credibility_score: {
+      "type": "OBJECT",
+      "properties": {
+        "score": { "type": "NUMBER", "description": "A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number." },
+        "reasoning": { "type": "STRING", "description": "A concise paragraph justifying the final score based on the analysis." }
+      },
+      "required": ["score", "reasoning"]
+    },
+    recommendations: { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3 practical recommendations for the reader (e.g., 'Verify with official sources.')." }
+  },
+  "required": ["report_title", "article_details", "analysis", "overall_credibility_score", "recommendations"]
+};
 
-  const { articleText, articleUrl, articleHeadline, language } = input;
-  let articleInfo = '';
-  if (articleText) articleInfo = `News Text: "${articleText}"`;
-  else if (articleUrl) articleInfo = `URL: "${articleUrl}"`;
-  else if (articleHeadline) articleInfo = `Headline: "${articleHeadline}"`;
+// --- Helper Functions ---
 
-  try {
-    // Step 1: Perform search and gather facts and sources.
-    const firstResult = await model.generateContent([
-        `First, find information and sources about the following news item: ${articleInfo}.`,
-        `Based on your search, provide a summary of the key facts, findings, and a list of all source URLs you used. Do not generate the final report yet.`
-    ]);
+/**
+ * Extracts source URIs from the Gemini grounding metadata.
+ * @param response The raw response object from the Gemini API.
+ * @returns An array of string URIs.
+ */
+const extractSources = (response: any): string[] => {
+    let sources: string[] = [];
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+        sources = groundingMetadata.groundingAttributions
+            .map((attr: any) => attr.web?.uri)
+            .filter(Boolean); // Filter out any null/undefined URIs
+    }
+    return sources;
+};
 
-    const searchResponse = firstResult.response;
-    const searchSummary = searchResponse.text();
-    const functionCalls = searchResponse.functionCalls();
-    
-    const sources: string[] = [];
-    if (functionCalls && functionCalls.length > 0) {
-        for (const call of functionCalls) {
-            if (call.name === 'googleSearch' && call.args && Array.isArray(call.args.results)) {
-                for (const searchResult of call.args.results) {
-                    if (searchResult.link) {
-                        sources.push(searchResult.link);
-                    }
-                }
+/**
+ * Fetches data with exponential backoff for handling transient errors like rate limiting.
+ */
+const exponentialBackoffFetch = async (url: string, options: RequestInit, maxRetries = 5): Promise<Response> => {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.status === 429 || response.status >= 500) { // Retry on rate limit or server errors
+                 if (i === maxRetries - 1) throw new Error(`Request failed after ${maxRetries} retries with status ${response.status}.`);
+                 console.warn(`Request failed with status ${response.status}. Retrying in ${1000 * (i + 1)}ms...`);
+                 await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                 continue;
             }
+            return response;
+        } catch (error) {
+            if (i === maxRetries - 1) throw error;
+            console.error("Network error during fetch. Retrying...", error);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
         }
     }
-    
-    // Step 2: Generate the final JSON report using the search results from Step 1.
-    const finalPrompt = `
-        You are an advanced reasoning engine for detecting fake news.
-        Based on the initial research summary and the provided source URLs below, generate a final credibility report in ${language || 'en'}.
+    throw new Error("Fetch failed after multiple retries.");
+};
 
-        Initial Research Summary:
-        ${searchSummary}
 
-        Sources Found:
-        ${sources.join('\n')}
+// --- Main Analysis Function ---
 
-        Original News Item:
-        ${articleInfo}
-        
-        Your output MUST be a single JSON object that conforms to the following schema. You must include the provided sources in the "sources" field of the JSON.
-        {
-          "type": "object",
-          "properties": {
-            "overallScore": { "type": "number", "description": "A credibility score from 0-100." },
-            "verdict": { "type": "string", "description": "Your final judgment (e.g., 'Likely Real', 'Likely Fake', 'Uncertain')." },
-            "summary": { "type": "string", "description": "A brief summary of the article's main points and the analysis findings." },
-            "biases": { "type": "string", "description": "An analysis of any detected biases (e.g., political, commercial)." },
-            "flaggedContent": { "type": "array", "items": { "type": "string" }, "description": "A list of specific issues found, such as sensationalism or unverified claims." },
-            "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." },
-            "sources": { "type": "array", "items": { "type": "string" }, "description": "A list of URLs used to corroborate facts." }
-          },
-          "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
-        }
-    `;
-
-    const jsonModel = genAI.getGenerativeModel({
+async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ 
         model: 'gemini-2.5-flash',
         generationConfig: {
-            responseMimeType: 'application/json',
-        }
+            responseMimeType: "application/json",
+            responseSchema: CREDIBILITY_REPORT_SCHEMA,
+        },
+        tools: [{ "googleSearch": {} }],
+        systemInstruction: `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
+    
+        **Instructions:**
+        1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item.
+        2. **STRICTLY** adhere to the provided JSON schema for your final output.
+        3. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
+        4. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
+        5. Generate the entire report in the ${input.language || 'English'} language.`
     });
 
-    const finalResult = await jsonModel.generateContent(finalPrompt);
-    let responseText = finalResult.response.text();
+    const { articleText, articleUrl, articleHeadline } = input;
     
-    let parsedJson;
+    let articleInfo = '';
+    if (articleUrl) {
+        articleInfo = `the article found at this URL: ${articleUrl}. You MUST use your search tool to verify and fetch the content from this URL.`;
+    } else if (articleText) {
+        articleInfo = `the following article text: "${articleText}"`;
+    } else if (articleHeadline) {
+        articleInfo = `the article with the headline: "${articleHeadline}"`;
+    } else {
+        return { error: 'INVALID_INPUT', details: 'No URL, text, or headline was provided for analysis.' };
+    }
+
+    const prompt = `Analyze the credibility of ${articleInfo}`;
+
     try {
-        parsedJson = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Failed to parse JSON:", responseText);
-      return {
-        error: 'INVALID_JSON',
-        details: 'The AI model returned an invalid JSON format.',
-      };
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content?.parts?.[0]?.text) {
+            const jsonText = response.candidates[0].content.parts[0].text;
+            let parsedData: NewsSleuthOutput;
+            
+            try {
+                parsedData = JSON.parse(jsonText);
+            } catch (e) {
+                console.error("Failed to parse JSON:", jsonText);
+                return { error: 'INVALID_JSON', details: 'The AI model returned an invalid JSON format, preventing structural parsing.' };
+            }
+
+            const fetchedSources = extractSources(response);
+
+            // Attach sources and return the validated data
+            parsedData.sources = fetchedSources;
+            return parsedData;
+
+        } else {
+            const blockReason = response.promptFeedback?.blockReason || 'Unknown failure';
+            console.error('AI content generation failed:', response.promptFeedback);
+            return { error: 'AI_FAILURE', details: `AI content generation failed. Reason: ${blockReason}` };
+        }
+
+    } catch (e: any) {
+        console.error("API or Network Error:", e);
+        return { error: 'API_EXECUTION_FAILED', details: e.message || 'The AI model failed to generate a response.' };
     }
+};
 
-    const validation = NewsSleuthOutputSchema.safeParse(parsedJson);
-    if (!validation.success) {
-      console.error(`AI returned invalid JSON structure: ${validation.error.message}`);
-      return {
-        error: 'INVALID_JSON',
-        details: `The AI model returned an invalid JSON structure: ${validation.error.message}`,
-      };
-    }
-    
-    const output = validation.data;
-    if (sources.length > 0) {
-        output.sources = sources;
-    }
-
-
-    return output;
-
-  } catch (error: any) {
-    console.error('API Error:', error);
-    if (error.response && error.response.promptFeedback) {
-      return {
-        error: 'API_SAFETY_ERROR',
-        details: `The analysis was blocked due to a content safety policy: ${error.response.promptFeedback.blockReason}`,
-      };
-    }
-    return {
-      error: 'API_EXECUTION_FAILED',
-      details: error.message || 'The AI model failed to generate a response.',
-    };
-  }
-}
-
-export async function newsSleuthAnalysis(
-  input: NewsSleuthInput
-): Promise<NewsSleuthOutput | NewsSleuthError> {
-  const result = await runNewsSleuthAnalysis(input);
-  return result;
-}
+export { runNewsSleuthAnalysis as newsSleuthAnalysis };
