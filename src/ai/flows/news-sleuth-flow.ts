@@ -69,10 +69,11 @@ export async function newsSleuthAnalysis(
     
     1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
     2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
-    3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    4.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
-    5.  You MUST output your final report in ${input.language}.
-    6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    3.  In your 'reasoning' field, you MUST cite the specific URLs of the sources you find via the search tool.
+    4.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    5.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
+    6.  You MUST output your final report in ${input.language}.
+    7.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
     JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
 
