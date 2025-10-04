@@ -4,14 +4,13 @@
  * @fileOverview A news article credibility analysis AI agent.
  *
  * This file defines the server-side logic for the News Sleuth feature, which
- * analyzes news articles for credibility using a Genkit flow.
+ * analyzes news articles for credibility.
  */
 
 import {
   GoogleGenerativeAI,
 } from '@google/generative-ai';
 import {
-  NewsSleuthInputSchema,
   NewsSleuthOutputSchema,
   type NewsSleuthInput,
   type NewsSleuthOutput,
@@ -24,7 +23,6 @@ async function runNewsSleuthAnalysis(
 ): Promise<NewsSleuthOutput | NewsSleuthError> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
   
-  // Use a model that supports tool use
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
     tools: [{
@@ -39,7 +37,7 @@ async function runNewsSleuthAnalysis(
   else if (articleHeadline) articleInfo = `Headline: "${articleHeadline}"`;
   
   const prompt = `
-    You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories.
+    You are an advanced reasoning engine for detecting fake news. You MUST use your googleSearch tool to corroborate facts and find related stories.
     Generate a credibility report in ${language || 'en'}.
     
     Your output MUST be a single JSON object that conforms to the following schema:
@@ -56,7 +54,7 @@ async function runNewsSleuthAnalysis(
       "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
     }
 
-    Do not include the sources in the JSON. The sources will be derived from your tool calls.
+    Do not include the sources in this primary JSON output. The sources will be derived from your tool calls.
 
     Analyze the following:
     ${articleInfo}
@@ -67,15 +65,13 @@ async function runNewsSleuthAnalysis(
     const response = result.response;
     
     // Extract sources from function calls first
-    const functionCalls = response.functionCalls();
     const sources: string[] = [];
+    const functionCalls = response.functionCalls();
     if (functionCalls && functionCalls.length > 0) {
         for (const call of functionCalls) {
-            // The tool name is not always 'googleSearch', so we check for 'tool_code' which is more generic
-            const searchResults = call.args?.results || call.args?.tool_code?.results;
-            if (searchResults) {
-                for (const res of searchResults) {
-                    if (res.url) {
+            if (call.name === 'googleSearch' && call.args && Array.isArray(call.args.results)) {
+                for (const res of call.args.results) {
+                     if (res.url) {
                         sources.push(res.url);
                     }
                 }
@@ -89,6 +85,12 @@ async function runNewsSleuthAnalysis(
     const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
     if (jsonMatch && jsonMatch[1]) {
         responseText = jsonMatch[1];
+    } else {
+        const startIndex = responseText.indexOf('{');
+        const endIndex = responseText.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+            responseText = responseText.substring(startIndex, endIndex + 1);
+        }
     }
 
     let parsedJson;
