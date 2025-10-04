@@ -67,14 +67,13 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 
     // 3. Call the API and Parse the Markdown-wrapped JSON
     try {
-        const { response } = await ai.generate({
+        const response = await ai.generate({
             model: googleAI.model('gemini-2.5-flash'),
             prompt: userPrompt,
             config: {
                 // IMPORTANT: Removed responseMimeType/responseSchema 
                 // to support the combination of tools and structured output.
             },
-            // REMOVED: tools: [googleSearch] as it is not needed for grounding.
             system: systemPrompt,
         });
 
