@@ -7,8 +7,11 @@
  * analyzes news articles for credibility using a Genkit flow.
  */
 
-import {ai} from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import {
+  GoogleGenerativeAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} from '@google/generative-ai';
 import {
   NewsSleuthInputSchema,
   NewsSleuthOutputSchema,
@@ -17,51 +20,67 @@ import {
   type NewsSleuthError,
 } from '@/ai/schemas';
 
-const newsSleuthPrompt = ai.definePrompt({
-  name: 'newsSleuthPrompt',
-  tools: [googleAI.tool('googleSearch')],
-  output: {
-    schema: NewsSleuthOutputSchema,
-    format: 'json',
-  },
-  prompt: `You are a world-class investigative journalist and fact-checker AI.
-Your task is to analyze the provided article information for credibility and generate a report.
-You MUST use the Google Search tool to find corroborating or contradictory sources for the claims made in the article.
 
-Your final JSON report must be in {{language}} and include:
-- overallScore: A credibility score from 0-100.
-- verdict: Your final judgment (e.g., 'Likely Real', 'Likely Fake', 'Uncertain').
-- summary: A brief summary of the article's main points and the analysis findings.
-- biases: An analysis of any detected biases (e.g., political, commercial).
-- flaggedContent: A list of specific issues found, such as sensationalism or unverified claims.
-- reasoning: The reasoning behind the overall verdict and score.
-- sources: A list of URLs you used to corroborate facts. This MUST be populated from the search results.
+async function runNewsSleuthAnalysis(
+  input: NewsSleuthInput
+): Promise<NewsSleuthOutput> {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
+  });
 
-Analyze the following:
-{{#if articleText}}Article Text: "{{articleText}}"{{/if}}
-{{#if articleUrl}}Article URL: "{{articleUrl}}"{{/if}}
-{{#if articleHeadline}}Article Headline: "{{articleHeadline}}"{{/if}}
-`,
-});
+  const { articleText, articleUrl, articleHeadline, language } = input;
+  let articleInfo = '';
+  if (articleText) articleInfo = `News Text: "${articleText}"`;
+  else if (articleUrl) articleInfo = `URL: "${articleUrl}"`;
+  else if (articleHeadline) articleInfo = `Headline: "${articleHeadline}"`;
+  
+  const prompt = `
+    You are an advanced reasoning engine for detecting fake news. You MUST use your search capabilities to corroborate facts and find related stories.
+    Generate a credibility report in ${language || 'en'}.
+    Your output MUST be a single JSON object that conforms to the following schema:
+    {
+      "type": "object",
+      "properties": {
+        "overallScore": { "type": "number", "description": "A credibility score from 0-100." },
+        "verdict": { "type": "string", "description": "Your final judgment (e.g., 'Likely Real', 'Likely Fake', 'Uncertain')." },
+        "summary": { "type": "string", "description": "A brief summary of the article's main points and the analysis findings." },
+        "biases": { "type": "string", "description": "An analysis of any detected biases (e.g., political, commercial)." },
+        "flaggedContent": { "type": "array", "items": { "type": "string" }, "description": "A list of specific issues found, such as sensationalism or unverified claims." },
+        "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." },
+        "sources": { "type": "array", "items": { "type": "string" }, "description": "A list of URLs you used to corroborate facts. This MUST be populated from your search results." }
+      },
+      "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
+    }
 
-const newsSleuthFlow = ai.defineFlow(
-  {
-    name: 'newsSleuthFlow',
-    inputSchema: NewsSleuthInputSchema,
-    outputSchema: NewsSleuthOutputSchema,
-  },
-  async (input) => {
-    const { output } = await newsSleuthPrompt(input);
-    return output!;
+    Analyze the following:
+    ${articleInfo}
+  `;
+
+  const result = await model.generateContent(prompt);
+  const responseText = result.response.text();
+  
+  // The response is now guaranteed to be JSON because of responseMimeType.
+  const parsedJson = JSON.parse(responseText);
+
+  // Validate with Zod schema before returning
+  const validation = NewsSleuthOutputSchema.safeParse(parsedJson);
+  if (!validation.success) {
+    throw new Error(`AI returned invalid JSON structure: ${validation.error.message}`);
   }
-);
+
+  return validation.data;
+}
 
 
 export async function newsSleuthAnalysis(
   input: NewsSleuthInput
 ): Promise<NewsSleuthOutput | NewsSleuthError> {
   try {
-    const result = await newsSleuthFlow(input);
+    const result = await runNewsSleuthAnalysis(input);
     return result;
   } catch (error: any) {
     console.error('API Error:', error);
@@ -70,6 +89,12 @@ export async function newsSleuthAnalysis(
           error: 'API_SAFETY_ERROR',
           details: 'The analysis was blocked due to the content safety policy. The article may contain sensitive topics.',
         };
+    }
+     if (error.message.includes('invalid JSON')) {
+      return {
+        error: 'INVALID_JSON',
+        details: `The AI model returned an invalid JSON format. Details: ${error.message}`,
+      }
     }
     return {
       error: 'API_EXECUTION_FAILED',
