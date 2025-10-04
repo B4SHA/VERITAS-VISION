@@ -13,6 +13,7 @@ import {ai} from '@/ai/genkit';
 import {getArticleContentFromUrl} from '@/services/url-fetcher';
 import {z} from 'genkit';
 import { NewsSleuthInputSchema, NewsSleuthOutputSchema, type NewsSleuthInput, type NewsSleuthOutput } from '@/ai/schemas';
+import { googleAI } from '@genkit-ai/google-genai';
 
 
 export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
@@ -36,6 +37,7 @@ const fetcherTool = ai.defineTool(
 
 const prompt = ai.definePrompt({
   name: 'newsSleuthPrompt',
+  model: googleAI.model('gemini-2.5-flash'),
   tools: [fetcherTool],
   input: {schema: NewsSleuthInputSchema},
   output: {schema: NewsSleuthOutputSchema},
