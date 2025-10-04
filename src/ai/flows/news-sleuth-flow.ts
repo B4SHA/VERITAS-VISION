@@ -7,9 +7,6 @@
  * via a single, highly constrained Gemini API call, ensuring reliable JSON output
  * and using Google Search grounding for fact-checking.
  */
-import {
-  GoogleGenerativeAI,
-} from '@google/generative-ai';
 
 import type {
   NewsSleuthInput,
@@ -56,24 +53,21 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
     const systemPrompt = `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
     
     **Instructions:**
-    1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item.
-    2. **STRICTLY** adhere to the following JSON schema and format your entire output as a single JSON object.
-    3. **YOUR FINAL OUTPUT MUST BE THE JSON OBJECT WRAPPED IN A MARKDOWN CODE BLOCK LIKE THIS: \`\`\`json\n{...}\n\`\`\`**
-    4. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
-    5. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
-    6. Generate the entire report in the ${language || 'English'} language.`;
+    1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item. If a URL is provided, you MUST attempt to access it.
+    2. **IF THE URL IS INACCESSIBLE** (e.g., returns a 'Page Not Found' or 404 error), you MUST state this clearly in your analysis. If the URL contains a date that is in the future, you should point this out as a likely reason for the page not being found. Then, base your analysis on the headline from the URL and other information found via search.
+    3. **STRICTLY** adhere to the following JSON schema and format your entire output as a single JSON object.
+    4. **YOUR FINAL OUTPUT MUST BE THE JSON OBJECT WRAPPED IN A MARKDOWN CODE BLOCK LIKE THIS: \`\`\`json\n{...}\n\`\`\`**
+    5. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
+    6. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
+    7. Generate the entire report in the ${language || 'English'} language.`;
 
-    const userPrompt = `Analyze the credibility of ${articleInfo}. Your output MUST be a single JSON object that conforms to the following schema: ${JSON.stringify(CREDIBILITY_REPORT_SCHEMA)}`;
+    const userPrompt = `Analyze the credibility of ${articleInfo}`;
 
     // 3. Call the API and Parse the Markdown-wrapped JSON
     try {
         const response = await ai.generate({
             model: googleAI.model('gemini-2.5-flash'),
             prompt: userPrompt,
-            config: {
-                // IMPORTANT: Removed responseMimeType/responseSchema 
-                // to support the combination of tools and structured output.
-            },
             system: systemPrompt,
         });
 
@@ -130,9 +124,6 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 
     } catch (e: any) {
         console.error("API or Network Error:", e);
-        if (e.message && e.message.includes("is unsupported")) {
-            return { error: 'API_CONFIG_ERROR', details: "The current AI configuration doesn't support the combination of features being requested. Please contact support." };
-        }
         return { error: 'API_EXECUTION_FAILED', details: e.message || 'The AI model failed to generate a response.' };
     }
 };
