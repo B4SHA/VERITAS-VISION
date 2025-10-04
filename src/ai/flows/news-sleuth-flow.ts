@@ -121,16 +121,11 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ 
         model: 'gemini-2.5-flash',
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: CREDIBILITY_REPORT_SCHEMA,
-        },
-        tools: [{ "googleSearch": {} }],
         systemInstruction: `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
     
         **Instructions:**
         1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item.
-        2. **STRICTLY** adhere to the provided JSON schema for your final output.
+        2. **STRICTLY** adhere to the JSON schema provided in the user prompt for your final output. Your entire output must be a single JSON object.
         3. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
         4. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
         5. Generate the entire report in the ${input.language || 'English'} language.`
@@ -149,10 +144,14 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
         return { error: 'INVALID_INPUT', details: 'No URL, text, or headline was provided for analysis.' };
     }
 
-    const prompt = `Analyze the credibility of ${articleInfo}`;
+    const prompt = `Analyze the credibility of ${articleInfo}. Your output MUST be a single JSON object that conforms to the following schema: ${JSON.stringify(CREDIBILITY_REPORT_SCHEMA)}`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent({
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ "googleSearch": {} }],
+        });
+        
         const response = result.response;
         
         if (response.candidates && response.candidates.length > 0 && response.candidates[0].content?.parts?.[0]?.text) {
@@ -178,8 +177,12 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
             return { error: 'AI_FAILURE', details: `AI content generation failed. Reason: ${blockReason}` };
         }
 
-    } catch (e: any) {
+    } catch (e: any)       {
         console.error("API or Network Error:", e);
+        // Check for the specific error message and provide a more user-friendly response.
+        if (e.message && e.message.includes("is unsupported")) {
+            return { error: 'API_CONFIG_ERROR', details: "The current AI configuration doesn't support the combination of features being requested. Please contact support." };
+        }
         return { error: 'API_EXECUTION_FAILED', details: e.message || 'The AI model failed to generate a response.' };
     }
 };
