@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
@@ -347,7 +347,7 @@ export function NewsSleuth() {
                               </div>
                           </CardHeader>
                           <CardContent>
-                            {typeof report.overall_credibility_score.score === 'number' && (
+                            {typeof report.overall_credibility_score.score === 'number' ? (
                               <>
                                 <div className="flex items-baseline gap-4">
                                   <span className="font-bold text-5xl text-primary">{report.overall_credibility_score.score.toFixed(1)}</span>
@@ -355,7 +355,7 @@ export function NewsSleuth() {
                                 </div>
                                 <Progress value={getProgressValue(report.overall_credibility_score.score)} indicatorClassName={getProgressIndicatorClassName(report.overall_credibility_score.score)} className="my-3"/>
                               </>
-                            )}
+                            ) : null}
                             {report.overall_credibility_score.reasoning && (
                                 <p className="text-sm text-muted-foreground">{report.overall_credibility_score.reasoning}</p>
                             )}
@@ -421,5 +421,3 @@ export function NewsSleuth() {
     </div>
   );
 }
-
-    
