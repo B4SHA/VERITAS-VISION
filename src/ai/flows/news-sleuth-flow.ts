@@ -89,14 +89,18 @@ export async function newsSleuthAnalysis(
     You are a world-class investigative journalist and fact-checker AI.
     Your task is to analyze the provided article information for credibility and generate a report.
     
-    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
-    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
-    3.  In your 'reasoning' field, you MUST cite the specific URLs of the sources you find via the search tool.
-    4.  In the 'sources' array, you MUST list all URLs you found and referenced during your search.
-    5.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    6.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
-    7.  You MUST output your final report in ${input.language}.
-    8.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    // **MODIFIED INSTRUCTION 1: COMBINE AND CONDITIONALIZE SEARCH**
+    1. You MUST use the Google Search tool to find corroborating or contradictory sources for the claims made in the Article Info.
+    
+    // **NEW INSTRUCTION 2: EXPLICITLY DEFINE THE SEARCH BEHAVIOR**
+    2. If an Article URL is provided, your first search query MUST be that URL to fetch the full content. If only Article Text or Headline is provided, your first search query MUST be a concise summary of the key claims from the provided text/headline.
+    
+    3. In your 'reasoning' field, you MUST cite the specific URLs of the sources you find via the search tool.
+    4. In the 'sources' array, you MUST list all URLs you found and referenced during your search.
+    5. Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    6. Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
+    7. You MUST output your final report in ${input.language}.
+    8. Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
     JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
 
