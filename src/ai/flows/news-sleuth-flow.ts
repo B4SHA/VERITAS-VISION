@@ -74,7 +74,7 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
                 // IMPORTANT: Removed responseMimeType/responseSchema 
                 // to support the combination of tools and structured output.
             },
-            tools: [{googleSearch: {}}],
+            tools: [{googleSearch: {} as any}],
             system: systemPrompt,
         });
 
