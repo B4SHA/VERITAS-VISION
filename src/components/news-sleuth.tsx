@@ -402,5 +402,3 @@ export function NewsSleuth() {
     </div>
   );
 }
-
-    
