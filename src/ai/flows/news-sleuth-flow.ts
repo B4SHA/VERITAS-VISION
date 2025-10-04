@@ -70,9 +70,9 @@ async function runNewsSleuthAnalysis(
     if (functionCalls && functionCalls.length > 0) {
         for (const call of functionCalls) {
             if (call.name === 'googleSearch' && call.args && Array.isArray(call.args.results)) {
-                for (const res of call.args.results) {
-                     if (res.url) {
-                        sources.push(res.url);
+                for (const searchResult of call.args.results) {
+                     if (searchResult.url) {
+                        sources.push(searchResult.url);
                     }
                 }
             }
