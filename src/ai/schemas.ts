@@ -7,6 +7,62 @@ const AnalysisDetailSchema = z.object({
   supporting_points: z.array(z.string()).describe("3-5 bullet points confirming or refuting the facts based on search grounding."),
 });
 
+export const CREDIBILITY_REPORT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    report_title: { "type": "STRING", "description": "A concise title for the credibility report." },
+    article_details: {
+      "type": "OBJECT",
+      "properties": {
+        "title": { "type": "STRING", "description": "The exact title of the article being analyzed." },
+        "main_claim": { "type": "STRING", "description": "The single, most important claim made in the article." }
+      },
+      "required": ["title", "main_claim"]
+    },
+    analysis: {
+      "type": "OBJECT",
+      "properties": {
+        "factual_accuracy": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Low', 'High', 'Speculative')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points confirming or refuting the facts based on search grounding." }
+          },
+          "required": ["assessment", "supporting_points"]
+        },
+        "source_reliability": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Verifiable', 'Anonymous', 'Social Media Rumor')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points analyzing the article's sources and citing the search results." }
+          },
+          "required": ["assessment", "supporting_points"]
+        },
+        "bias_manipulation": {
+          "type": "OBJECT",
+          "properties": {
+            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Clickbait', 'Neutral', 'Sensationalist')." },
+            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points on biased language, tone, or cherry-picking of facts." }
+          },
+          "required": ["assessment", "supporting_points"]
+        }
+      },
+      "required": ["factual_accuracy", "source_reliability", "bias_manipulation"]
+    },
+    overall_credibility_score: {
+      "type": "OBJECT",
+      "properties": {
+        "score": { "type": "NUMBER", "description": "A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number." },
+        "reasoning": { "type": "STRING", "description": "A concise paragraph justifying the final score based on the analysis." }
+      },
+      "required": ["score", "reasoning"]
+    },
+    recommendations: { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3 practical recommendations for the reader (e.g., 'Verify with official sources.')." }
+  },
+  "required": ["report_title", "article_details", "analysis", "overall_credibility_score", "recommendations"]
+};
+
+
 // News Sleuth Schemas (Updated based on example)
 export const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The full text of the news article.'),

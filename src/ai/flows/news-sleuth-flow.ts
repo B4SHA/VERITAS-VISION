@@ -16,64 +16,8 @@ import type {
   NewsSleuthOutput,
   NewsSleuthError,
 } from '@/ai/schemas';
-
-// --- JSON Schema for Structured Output ---
-const CREDIBILITY_REPORT_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    report_title: { "type": "STRING", "description": "A concise title for the credibility report." },
-    article_details: {
-      "type": "OBJECT",
-      "properties": {
-        "title": { "type": "STRING", "description": "The exact title of the article being analyzed." },
-        "main_claim": { "type": "STRING", "description": "The single, most important claim made in the article." }
-      },
-      "required": ["title", "main_claim"]
-    },
-    analysis: {
-      "type": "OBJECT",
-      "properties": {
-        "factual_accuracy": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Low', 'High', 'Speculative')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points confirming or refuting the facts based on search grounding." }
-          },
-          "required": ["assessment", "supporting_points"]
-        },
-        "source_reliability": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Verifiable', 'Anonymous', 'Social Media Rumor')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points analyzing the article's sources and citing the search results." }
-          },
-          "required": ["assessment", "supporting_points"]
-        },
-        "bias_manipulation": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Clickbait', 'Neutral', 'Sensationalist')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points on biased language, tone, or cherry-picking of facts." }
-          },
-          "required": ["assessment", "supporting_points"]
-        }
-      },
-      "required": ["factual_accuracy", "source_reliability", "bias_manipulation"]
-    },
-    overall_credibility_score: {
-      "type": "OBJECT",
-      "properties": {
-        "score": { "type": "NUMBER", "description": "A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number." },
-        "reasoning": { "type": "STRING", "description": "A concise paragraph justifying the final score based on the analysis." }
-      },
-      "required": ["score", "reasoning"]
-    },
-    recommendations: { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3 practical recommendations for the reader (e.g., 'Verify with official sources.')." }
-  },
-  "required": ["report_title", "article_details", "analysis", "overall_credibility_score", "recommendations"]
-};
-
-// --- Helper Functions ---
+import { ai } from '@/ai/genkit';
+import { CREDIBILITY_REPORT_SCHEMA } from '@/ai/schemas';
 
 /**
  * Extracts source URIs from the Gemini grounding metadata.
@@ -91,38 +35,7 @@ const extractSources = (response: any): string[] => {
     return sources;
 };
 
-/**
- * Fetches data with exponential backoff for handling transient errors like rate limiting.
- */
-const exponentialBackoffFetch = async (url: string, options: RequestInit, maxRetries = 5): Promise<Response> => {
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            const response = await fetch(url, options);
-            if (response.status === 429 || response.status >= 500) { // Retry on rate limit or server errors
-                 if (i === maxRetries - 1) throw new Error(`Request failed after ${maxRetries} retries with status ${response.status}.`);
-                 console.warn(`Request failed with status ${response.status}. Retrying in ${1000 * (i + 1)}ms...`);
-                 await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-                 continue;
-            }
-            return response;
-        } catch (error) {
-            if (i === maxRetries - 1) throw error;
-            console.error("Network error during fetch. Retrying...", error);
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-        }
-    }
-    throw new Error("Fetch failed after multiple retries.");
-};
-
-
-// --- Main Analysis Function ---
-
 async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash'
-    });
-
     const { articleText, articleUrl, articleHeadline, language } = input;
     
     // 1. Construct the most specific query for the AI to use
@@ -151,24 +64,21 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 
     const userPrompt = `Analyze the credibility of ${articleInfo}. Your output MUST be a single JSON object that conforms to the following schema: ${JSON.stringify(CREDIBILITY_REPORT_SCHEMA)}`;
 
-    // 3. Construct the API Payload (Removed MimeType and Schema for tool use compatibility)
-    const payload = {
-        contents: [{ parts: [{ text: userPrompt }] }],
-        tools: [{"googleSearch": {}}], // Corrected tool name
-        systemInstruction: {
-            parts: [{ text: systemPrompt }]
-        },
-        // IMPORTANT: Removed generationConfig.responseMimeType/responseSchema 
-        // to support the combination of tools and structured output.
-    };
-
-    // 4. Call the API and Parse the Markdown-wrapped JSON
+    // 3. Call the API and Parse the Markdown-wrapped JSON
     try {
-        const result = await model.generateContent(payload);
-        const response = result.response;
+        const { response } = await ai.generate({
+            model: 'gemini-2.5-flash',
+            prompt: userPrompt,
+            config: {
+                // IMPORTANT: Removed responseMimeType/responseSchema 
+                // to support the combination of tools and structured output.
+            },
+            tools: [{googleSearch: {}}],
+            system: systemPrompt,
+        });
 
-        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content?.parts?.[0]?.text) {
-            const rawText = response.candidates[0].content.parts[0].text;
+        const rawText = response.text;
+        if (rawText) {
             let jsonText = ''; 
             
             // 4a. Attempt to extract JSON from ```json ... ``` markdown block (most reliable way)
@@ -213,8 +123,8 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
             return parsedData;
 
         } else {
-            const blockReason = response.promptFeedback?.blockReason || 'Unknown failure';
-            console.error('AI content generation failed:', response.promptFeedback);
+            const blockReason = response.candidates?.[0]?.finishReason || 'Unknown failure';
+            console.error('AI content generation failed:', response);
             return { error: 'AI_FAILURE', details: `AI content generation failed. Reason: ${blockReason}` };
         }
 
@@ -228,5 +138,3 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 };
 
 export { runNewsSleuthAnalysis as newsSleuthAnalysis };
-
-    
