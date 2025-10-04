@@ -27,12 +27,12 @@ const NewsSleuthOutputJsonSchema = {
     "properties": {
         "overallScore": {
             "type": "number",
-            "description": "A credibility score from 0 to 100."
+            "description": "A credibility score from 0 to 100. Lower scores for hypothetical, future-dated, or factually incorrect premises."
         },
         "verdict": {
             "type": "string",
             "enum": ['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis'],
-            "description": "The final judgment on the article's credibility."
+            "description": "The final judgment. MUST be 'Likely Fake', 'Satire/Parody', or similar if the core premise is not factually true in the present."
         },
         "summary": {
             "type": "string",
@@ -45,7 +45,7 @@ const NewsSleuthOutputJsonSchema = {
         "flaggedContent": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims. If no issues, return an empty array."
+            "description": "A list of specific issues found. MUST include a note if the article is based on a hypothetical or future event."
         },
         "reasoning": {
             "type": "string",
@@ -86,21 +86,23 @@ export async function newsSleuthAnalysis(
   if (input.articleUrl) articleInfo += `URL: ${input.articleUrl}\n`;
 
   const prompt = `
-    You are a world-class investigative journalist and fact-checker AI.
-    Your task is to analyze the provided article information for credibility and generate a report.
-    
-    // **MODIFIED INSTRUCTION 1: COMBINE AND CONDITIONALIZE SEARCH**
-    1. You MUST use the Google Search tool to find corroborating or contradictory sources for the claims made in the Article Info.
-    
-    // **NEW INSTRUCTION 2: EXPLICITLY DEFINE THE SEARCH BEHAVIOR**
-    2. If an Article URL is provided, your first search query MUST be that URL to fetch the full content. If only Article Text or Headline is provided, your first search query MUST be a concise summary of the key claims from the provided text/headline.
-    
-    3. In your 'reasoning' field, you MUST cite the specific URLs of the sources you find via the search tool.
-    4. In the 'sources' array, you MUST list all URLs you found and referenced during your search.
-    5. Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
-    6. Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
-    7. You MUST output your final report in ${input.language}.
-    8. Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    You are a world-class investigative journalist and fact-checker AI. Your primary goal is to assess the credibility of an article based on the real-world, present-day facts.
+
+    **CRITICAL INSTRUCTION: REALITY CHECK**
+    Your analysis MUST be grounded in the current reality. If an article describes events that are set in the future, are hypothetical, or contain factually incorrect premises (e.g., a person holding a political office they do not currently hold), you MUST treat this as a major credibility issue. In such cases:
+    1.  The 'verdict' MUST be 'Likely Fake', 'Satire/Parody', or 'Uncertain'. It CANNOT be 'Likely Real'.
+    2.  The 'overallScore' MUST be low (under 40).
+    3.  The 'flaggedContent' array MUST include an entry explaining that the article is based on a hypothetical or non-factual scenario.
+    4.  The 'reasoning' MUST clearly state that the core premise is not true in the present reality.
+
+    **Analysis Workflow:**
+    1.  You MUST use the Google Search tool to find corroborating or contradictory sources.
+    2.  If an Article URL is provided, your first search MUST be that URL. Otherwise, search for the key claims.
+    3.  In your 'reasoning', you MUST cite the specific URLs of the sources found.
+    4.  In the 'sources' array, you MUST list all URLs you referenced.
+    5.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    6.  You MUST output your final report in ${input.language}.
+    7.  Your entire response MUST be a single, valid JSON object that strictly adheres to the provided JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
     
     JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
 
