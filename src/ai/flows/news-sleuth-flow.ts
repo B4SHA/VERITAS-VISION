@@ -4,12 +4,11 @@
  * @fileOverview A news article credibility analysis AI agent.
  *
  * This file defines the server-side logic for the News Sleuth feature, which
- * analyzes news articles for credibility.
+ * analyzes news articles for credibility using a multi-step prompting strategy.
  */
 
 import {
   GoogleGenerativeAI,
-  FunctionCall,
 } from '@google/generative-ai';
 import {
   NewsSleuthOutputSchema,
@@ -31,7 +30,7 @@ async function runNewsSleuthAnalysis(
   else if (articleHeadline) articleInfo = `Headline: "${articleHeadline}"`;
 
   try {
-    // Step 1: Perform search and gather facts
+    // Step 1: Perform search and gather facts and sources.
     const firstResult = await model.generateContent([
         `First, find information and sources about the following news item: ${articleInfo}.`,
         `Based on your search, provide a summary of the key facts, findings, and a list of all source URLs you used. Do not generate the final report yet.`
@@ -54,7 +53,7 @@ async function runNewsSleuthAnalysis(
         }
     }
     
-    // Step 2: Generate the final JSON report using the search results
+    // Step 2: Generate the final JSON report using the search results from Step 1.
     const finalPrompt = `
         You are an advanced reasoning engine for detecting fake news.
         Based on the initial research summary and the provided source URLs below, generate a final credibility report in ${language || 'en'}.
@@ -84,7 +83,6 @@ async function runNewsSleuthAnalysis(
         }
     `;
 
-    // Use a model configured for JSON output for the final step
     const jsonModel = genAI.getGenerativeModel({
         model: 'gemini-2.5-flash',
         generationConfig: {
@@ -116,6 +114,10 @@ async function runNewsSleuthAnalysis(
     }
     
     const output = validation.data;
+    if (sources.length > 0) {
+        output.sources = sources;
+    }
+
 
     return output;
 
