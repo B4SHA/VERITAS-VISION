@@ -15,7 +15,7 @@ import type {
 } from '@/ai/schemas';
 import { ai } from '@/ai/genkit';
 import { CREDIBILITY_REPORT_SCHEMA } from '@/ai/schemas';
-import { googleAI } from '@genkit-ai/google-genai';
+import { googleAI, googleSearch } from '@genkit-ai/google-genai';
 
 /**
  * Extracts source URIs from the Gemini grounding metadata.
@@ -36,10 +36,8 @@ const extractSources = (response: any): string[] => {
 async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
     const { articleText, articleUrl, articleHeadline, language } = input;
     
-    // 1. Construct the most specific query for the AI to use
     let articleInfo = '';
     if (articleUrl) {
-        // Instruct the AI to use search tool to access the URL content
         articleInfo = `the article found at this URL: ${articleUrl}. The AI MUST use its search tool to verify and fetch the content from this URL.`;
     } else if (articleText) {
         articleInfo = `the following article text: "${articleText}"`;
@@ -49,7 +47,6 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
         return { error: 'INVALID_INPUT', details: 'No URL, text, or headline was provided for analysis.' };
     }
 
-    // 2. Define System and User Prompts
     const systemPrompt = `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
     
     **Instructions:**
@@ -63,31 +60,28 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 
     const userPrompt = `Analyze the credibility of ${articleInfo}`;
 
-    // 3. Call the API and Parse the Markdown-wrapped JSON
     try {
         const response = await ai.generate({
             model: googleAI.model('gemini-2.5-flash'),
             prompt: userPrompt,
             system: systemPrompt,
+            tools: [googleSearch],
         });
 
         const rawText = response.text;
         if (rawText) {
             let jsonText = ''; 
             
-            // 4a. Attempt to extract JSON from ```json ... ``` markdown block (most reliable way)
             const markdownMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
             if (markdownMatch && markdownMatch[1]) {
                 jsonText = markdownMatch[1].trim();
             } else {
-                // 4b. Fallback: Search for the first '{' and last '}'
                 const startIndex = rawText.indexOf('{');
                 const endIndex = rawText.lastIndexOf('}');
                 
                 if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
                     jsonText = rawText.substring(startIndex, endIndex + 1);
                 } else {
-                    // If no JSON block is found at all, we can't parse it.
                     console.error("No JSON block or curly braces found in AI response.");
                     return { 
                         error: 'INVALID_JSON_BLOCK', 
@@ -99,7 +93,6 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
             let parsedData: NewsSleuthOutput;
             
             try {
-                // 4c. Attempt to parse the cleaned JSON string
                 parsedData = JSON.parse(jsonText);
             } catch (e) {
                 console.error("Failed to parse JSON string:", jsonText);
@@ -109,10 +102,7 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
                 };
             }
 
-            // Extract sources from the grounding metadata in the original response
             const fetchedSources = extractSources(response);
-
-            // Attach sources and return the validated data
             parsedData.sources = fetchedSources;
             return parsedData;
 
