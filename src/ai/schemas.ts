@@ -1,97 +1,26 @@
 
 import { z } from 'zod';
 
-// A more detailed analysis structure
-const AnalysisDetailSchema = z.object({
-  assessment: z.string().describe("Overall judgment (e.g., 'Low', 'High', 'Speculative')."),
-  supporting_points: z.array(z.string()).describe("3-5 bullet points confirming or refuting the facts based on search grounding."),
-});
-
-export const CREDIBILITY_REPORT_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    report_title: { "type": "STRING", "description": "A concise title for the credibility report." },
-    article_details: {
-      "type": "OBJECT",
-      "properties": {
-        "title": { "type": "STRING", "description": "The exact title of the article being analyzed." },
-        "main_claim": { "type": "STRING", "description": "The single, most important claim made in the article." }
-      },
-      "required": ["title", "main_claim"]
-    },
-    analysis: {
-      "type": "OBJECT",
-      "properties": {
-        "factual_accuracy": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Low', 'High', 'Speculative')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points confirming or refuting the facts based on search grounding." }
-          },
-          "required": ["assessment", "supporting_points"]
-        },
-        "source_reliability": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Verifiable', 'Anonymous', 'Social Media Rumor')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points analyzing the article's sources and citing the search results." }
-          },
-          "required": ["assessment", "supporting_points"]
-        },
-        "bias_manipulation": {
-          "type": "OBJECT",
-          "properties": {
-            "assessment": { "type": "STRING", "description": "Overall judgment (e.g., 'Clickbait', 'Neutral', 'Sensationalist')." },
-            "supporting_points": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3-5 bullet points on biased language, tone, or cherry-picking of facts." }
-          },
-          "required": ["assessment", "supporting_points"]
-        }
-      },
-      "required": ["factual_accuracy", "source_reliability", "bias_manipulation"]
-    },
-    overall_credibility_score: {
-      "type": "OBJECT",
-      "properties": {
-        "score": { "type": "NUMBER", "description": "A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number." },
-        "reasoning": { "type": "STRING", "description": "A concise paragraph justifying the final score based on the analysis." }
-      },
-      "required": ["score", "reasoning"]
-    },
-    recommendations: { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3 practical recommendations for the reader (e.g., 'Verify with official sources.')." }
-  },
-  "required": ["report_title", "article_details", "analysis", "overall_credibility_score", "recommendations"]
-};
-
-
-// News Sleuth Schemas (Updated based on example)
+// News Sleuth Schemas
 export const NewsSleuthInputSchema = z.object({
-  articleText: z.string().optional().describe('The full text of the news article.'),
-  articleUrl: z.string().optional().describe('The URL of the news article to be fetched and analyzed.'),
-  articleHeadline: z.string().optional().describe('The headline of the news article.'),
-  language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
+  articleText: z.string().optional().describe('The text content of the news article to analyze.'),
+  articleUrl: z.string().url().optional().describe('The URL of the news article to analyze.'),
+  articleHeadline: z.string().optional().describe('The headline of the news article to analyze.'),
+}).refine(data => data.articleText || data.articleUrl || data.articleHeadline, {
+  message: 'One of article text, URL, or headline must be provided.',
 });
+export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 
 export const NewsSleuthOutputSchema = z.object({
-    report_title: z.string().describe("A concise title for the credibility report."),
-    article_details: z.object({
-        title: z.string().describe("The exact title of the article being analyzed."),
-        main_claim: z.string().describe("The single, most important claim made in the article."),
-    }),
-    analysis: z.object({
-        factual_accuracy: AnalysisDetailSchema,
-        source_reliability: AnalysisDetailSchema,
-        bias_manipulation: AnalysisDetailSchema,
-    }),
-    overall_credibility_score: z.object({
-        score: z.number().describe("A final score from 1.0 (Very Low) to 5.0 (Very High), as a floating point number."),
-        reasoning: z.string().describe("A concise paragraph justifying the final score based on the analysis."),
-    }),
-    recommendations: z.array(z.string()).describe("3 practical recommendations for the reader (e.g., 'Verify with official sources.')."),
-    sources: z.array(z.string()).optional().describe('A list of URLs used to corroborate facts. This is populated from search results.'),
+  credibilityReport: z.object({
+    overallScore: z.number().describe('An overall credibility score for the article (0-100).'),
+    verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final verdict on the news article\'s authenticity.'),
+    summary: z.string().describe('A brief summary of the article content.'),
+    biases: z.array(z.string()).describe('A list of potential biases identified in the article.'),
+    flaggedContent: z.array(z.string()).describe('Specific content flagged for low credibility.'),
+    reasoning: z.string().describe('The reasoning behind the credibility assessment.'),
+  }),
 });
-
-
-export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 export type NewsSleuthError = { error: string; details?: string };
 

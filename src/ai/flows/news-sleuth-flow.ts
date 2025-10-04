@@ -1,119 +1,113 @@
 
 'use server';
+
 /**
- * @fileOverview A news article credibility analysis AI agent using structured output.
+ * @fileOverview A fake news detection AI agent.
  *
- * This file defines the server-side logic for generating a news credibility report
- * via a single, highly constrained Gemini API call, ensuring reliable JSON output
- * and using Google Search grounding for fact-checking.
+ * - newsSleuthAnalysis - A function that handles the news analysis process.
+ * - NewsSleuthInput - The input type for the newsSleuthAnalysis function.
+ * - NewsSleuthOutput - The return type for the newsSleuthAnalysis function.
  */
 
-import type {
-  NewsSleuthInput,
-  NewsSleuthOutput,
-  NewsSleuthError,
-} from '@/ai/schemas';
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import {ai} from '@/ai/genkit';
+import {getArticleContentFromUrl} from '@/services/url-fetcher';
+import {z} from 'genkit';
+import { NewsSleuthInputSchema, NewsSleuthOutputSchema, type NewsSleuthInput, type NewsSleuthOutput } from '@/ai/schemas';
 
-/**
- * Extracts source URIs from the Gemini grounding metadata.
- * @param response The raw response object from the Gemini API.
- * @returns An array of string URIs.
- */
-const extractSources = (response: any): string[] => {
-    let sources: string[] = [];
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-    if (groundingMetadata && groundingMetadata.groundingAttributions) {
-        sources = groundingMetadata.groundingAttributions
-            .map((attr: any) => attr.web?.uri)
-            .filter((uri: string) => uri);
-    }
-    return sources;
-};
 
-async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
-    const { articleText, articleUrl, articleHeadline, language } = input;
-    
-    let articleInfo = '';
-    if (articleUrl) {
-        articleInfo = `the article found at this URL: ${articleUrl}. The AI MUST use its search tool to verify and fetch the content from this URL.`;
-    } else if (articleText) {
-        articleInfo = `the following article text: "${articleText}"`;
-    } else if (articleHeadline) {
-        articleInfo = `the article with the headline: "${articleHeadline}"`;
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
+  return newsSleuthFlow(input);
+}
+
+const fetcherTool = ai.defineTool(
+  {
+    name: 'getArticleContentFromUrl',
+    description: 'Fetches the text content of a news article from a given URL. Use this tool if the user provides a URL.',
+    inputSchema: z.object({
+      url: z.string().url().describe('The URL of the news article to fetch.'),
+    }),
+    outputSchema: z.object({
+      textContent: z.string().describe('The extracted text content of the article.'),
+      error: z.string().optional().describe('An error message if fetching failed.'),
+    }),
+  },
+  async (input) => getArticleContentFromUrl(input.url)
+);
+
+const prompt = ai.definePrompt({
+  name: 'newsSleuthPrompt',
+  tools: [fetcherTool],
+  input: {schema: NewsSleuthInputSchema},
+  output: {schema: NewsSleuthOutputSchema},
+  prompt: `You are an expert in identifying fake news and assessing the credibility of news articles.
+
+  Your goal is to analyze news information for potential biases, low credibility content, and overall trustworthiness. Provide a detailed report including:
+  1. An overall credibility score (0-100).
+  2. A final verdict of 'Likely Real', 'Likely Fake', or 'Uncertain'.
+  3. A brief summary of the article.
+  4. A list of potential biases identified.
+  5. Specific content flagged for low credibility.
+  6. The reasoning behind your assessment.
+
+  The user has provided one of the following: the full text of a news article, its URL, or just its headline.
+
+  - If the user provides a URL, you MUST use the 'getArticleContentFromUrl' tool to fetch the article's text content first.
+  - If the tool returns an error, explain to the user that you were unable to retrieve the content from the URL and that they should try pasting the article text directly. In this case, set the verdict to 'Uncertain' and the score to 0.
+  - Your analysis should be based on the provided or fetched information.
+
+  {{#if articleText}}
+  News Article Text:
+  {{articleText}}
+  {{/if}}
+
+  {{#if articleUrl}}
+  News Article URL to analyze:
+  {{articleUrl}}
+  {{/if}}
+
+  {{#if articleHeadline}}
+  News Article Headline:
+  {{articleHeadline}}
+  {{/if}}
+  `,
+});
+
+const newsSleuthFlow = ai.defineFlow(
+  {
+    name: 'newsSleuthFlow',
+    inputSchema: NewsSleuthInputSchema,
+    outputSchema: NewsSleuthOutputSchema,
+  },
+  async (input) => {
+    const llmResponse = await prompt(input);
+    const toolRequest = llmResponse.toolRequests.find(
+      (req) => req.tool.name === 'getArticleContentFromUrl'
+    );
+
+    if (toolRequest) {
+      const toolResponse = await toolRequest.run();
+      const articleContent = (toolResponse as any).textContent;
+      const fetchError = (toolResponse as any).error;
+
+      if (fetchError || !articleContent) {
+        return {
+          credibilityReport: {
+            overallScore: 0,
+            verdict: 'Uncertain',
+            summary: 'Could not analyze the article.',
+            biases: [],
+            flaggedContent: [],
+            reasoning: `I was unable to retrieve the content from the provided URL. The website may be blocking automated access, or the URL may be incorrect. Please try copying and pasting the article text directly for analysis. Error: ${fetchError || 'Could not extract article text.'}`,
+          },
+        };
+      }
+      
+      const finalInput = { ...input, articleText: articleContent };
+      const finalResponse = await prompt(finalInput);
+      return finalResponse.output!;
+
     } else {
-        return { error: 'INVALID_INPUT', details: 'No URL, text, or headline was provided for analysis.' };
+        return llmResponse.output!;
     }
-
-    const systemPrompt = `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
-    
-    **Instructions:**
-    1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item. If a URL is provided, you MUST attempt to access it.
-    2. **IF THE URL IS INACCESSIBLE** (e.g., returns a 'Page Not Found' or 404 error), you MUST state this clearly in your analysis. If the URL contains a date that is in the future, you should point this out as a likely reason for the page not being found. Then, base your analysis on the headline from the URL and other information found via search.
-    3. **STRICTLY** adhere to the following JSON schema and format your entire output as a single JSON object.
-    4. **YOUR FINAL OUTPUT MUST BE THE JSON OBJECT WRAPPED IN A MARKDOWN CODE BLOCK LIKE THIS: \`\`\`json\n{...}\n\`\`\`**
-    5. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
-    6. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
-    7. Generate the entire report in the ${language || 'English'} language.`;
-
-    const userPrompt = `Analyze the credibility of ${articleInfo}`;
-
-    try {
-        const response = await ai.generate({
-            model: googleAI.model('gemini-2.5-flash'),
-            prompt: userPrompt,
-            system: systemPrompt,
-        });
-
-        const rawText = response.text;
-        if (rawText) {
-            let jsonText = ''; 
-            
-            const markdownMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
-            if (markdownMatch && markdownMatch[1]) {
-                jsonText = markdownMatch[1].trim();
-            } else {
-                const startIndex = rawText.indexOf('{');
-                const endIndex = rawText.lastIndexOf('}');
-                
-                if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
-                    jsonText = rawText.substring(startIndex, endIndex + 1);
-                } else {
-                    console.error("No JSON block or curly braces found in AI response.");
-                    return { 
-                        error: 'INVALID_JSON_BLOCK', 
-                        details: 'The AI response did not contain the expected JSON markdown block or curly braces.',
-                    };
-                }
-            }
-            
-            let parsedData: NewsSleuthOutput;
-            
-            try {
-                parsedData = JSON.parse(jsonText);
-            } catch (e) {
-                console.error("Failed to parse JSON string:", jsonText);
-                return { 
-                    error: 'INVALID_JSON_FORMAT', 
-                    details: 'The AI model returned text that could not be parsed as valid JSON after extraction.',
-                };
-            }
-
-            const fetchedSources = extractSources(response);
-            parsedData.sources = fetchedSources;
-            return parsedData;
-
-        } else {
-            const blockReason = response.candidates?.[0]?.finishReason || 'Unknown failure';
-            console.error('AI content generation failed:', response);
-            return { error: 'AI_FAILURE', details: `AI content generation failed. Reason: ${blockReason}` };
-        }
-
-    } catch (e: any) {
-        console.error("API or Network Error:", e);
-        return { error: 'API_EXECUTION_FAILED', details: e.message || 'The AI model failed to generate a response.' };
-    }
-};
-
-export { runNewsSleuthAnalysis as newsSleuthAnalysis };
+  }
+);

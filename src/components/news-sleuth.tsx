@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
@@ -21,6 +21,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLanguage } from "@/context/language-context";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "./ui/badge";
 
 const formSchema = z.object({
   inputType: z.enum(["text", "url", "headline"]).default("text"),
@@ -116,13 +117,13 @@ export function NewsSleuth() {
     }
     
     try {
-      const analysisResult = await newsSleuthAnalysis(analysisInput);
+      const analysisResult = await newsSleuthAnalysis(analysisInput as any);
       if (analysisResult && 'error' in analysisResult) {
-        setErrorResponse(analysisResult);
+        setErrorResponse(analysisResult as NewsSleuthError);
         toast({
             variant: "destructive",
             title: "Analysis Failed",
-            description: analysisResult.details || "The AI model failed to generate a response.",
+            description: (analysisResult as NewsSleuthError).details || "The AI model failed to generate a response.",
         });
       } else if (analysisResult) {
         setResult(analysisResult as NewsSleuthOutput);
@@ -143,34 +144,36 @@ export function NewsSleuth() {
     }
   }
 
-  const getProgressValue = (score: number) => (score / 5) * 100;
+  const getProgressValue = (score: number) => score;
   
   const getProgressIndicatorClassName = (score: number) => {
-    if (score < 2.5) return "bg-destructive";
-    if (score < 4.0) return "bg-accent";
+    if (score < 40) return "bg-destructive";
+    if (score < 70) return "bg-accent";
     return "bg-primary";
   };
   
-  const AnalysisSection = ({ title, data, assessment }: { title: string; data: string[]; assessment: string }) => {
-    if (!data) return null;
+  const getVerdictBadgeVariant = (verdict: string) => {
+    const lowerVerdict = verdict.toLowerCase();
+    if (lowerVerdict.includes('real')) return 'default';
+    if (lowerVerdict.includes('fake')) return 'destructive';
+    return 'secondary';
+  };
+
+  const AnalysisSection = ({ title, data }: { title: string; data: string[] }) => {
+    if (!data || data.length === 0) return null;
     return (
         <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
-        <AccordionTrigger>
-            <div className="flex items-center justify-between w-full">
-            <span>{title}</span>
-            <span className="text-sm font-medium text-muted-foreground">{assessment}</span>
-            </div>
-        </AccordionTrigger>
-        <AccordionContent>
-            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                {data.map((point, i) => <li key={i}>{point}</li>)}
-            </ul>
-        </AccordionContent>
+          <AccordionTrigger>{title}</AccordionTrigger>
+          <AccordionContent>
+              <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                  {data.map((point, i) => <li key={i}>{point}</li>)}
+              </ul>
+          </AccordionContent>
         </AccordionItem>
     );
   };
 
-  const report = result;
+  const report = result?.credibilityReport;
 
   return (
     <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
@@ -308,7 +311,7 @@ export function NewsSleuth() {
           
           <Card className="w-full shadow-lg border-2 border-border/80 bg-background/80 backdrop-blur-sm flex flex-col min-h-[500px] lg:min-h-[700px]">
             <CardHeader>
-              <CardTitle className="text-xl">{report?.report_title || t('newsSleuth.reportTitle')}</CardTitle>
+              <CardTitle className="text-xl">{t('newsSleuth.reportTitle')}</CardTitle>
               <CardDescription>
                 {t('newsSleuth.reportDescription')}
               </CardDescription>
@@ -339,78 +342,37 @@ export function NewsSleuth() {
               {report && (
                  <ScrollArea className="h-full pr-4">
                   <div className="space-y-6">
-                    {report.overall_credibility_score && (
-                      <Card>
-                          <CardHeader>
-                              <div className="flex justify-between items-center">
-                                <CardTitle className="text-lg">Overall Score</CardTitle>
+                    <Card>
+                        <CardHeader>
+                          <div className="flex justify-between items-center">
+                            <CardTitle className="text-lg">Overall Score</CardTitle>
+                             <Badge variant={getVerdictBadgeVariant(report.verdict)}>{report.verdict}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          {typeof report.overallScore === 'number' ? (
+                            <>
+                              <div className="flex items-baseline gap-4">
+                                <span className="font-bold text-5xl text-primary">{report.overallScore.toFixed(0)}</span>
+                                <span className="text-muted-foreground text-lg">/ 100</span>
                               </div>
-                          </CardHeader>
-                          <CardContent>
-                            {typeof report.overall_credibility_score.score === 'number' ? (
-                              <>
-                                <div className="flex items-baseline gap-4">
-                                  <span className="font-bold text-5xl text-primary">{report.overall_credibility_score.score.toFixed(1)}</span>
-                                  <span className="text-muted-foreground text-lg">/ 5.0</span>
-                                </div>
-                                <Progress value={getProgressValue(report.overall_credibility_score.score)} indicatorClassName={getProgressIndicatorClassName(report.overall_credibility_score.score)} className="my-3"/>
-                              </>
-                            ) : null}
-                            {report.overall_credibility_score.reasoning && (
-                                <p className="text-sm text-muted-foreground">{report.overall_credibility_score.reasoning}</p>
-                            )}
-                          </CardContent>
-                      </Card>
-                    )}
+                              <Progress value={getProgressValue(report.overallScore)} indicatorClassName={getProgressIndicatorClassName(report.overallScore)} className="my-3"/>
+                            </>
+                          ) : null}
+                           <p className="text-sm text-muted-foreground">{report.summary}</p>
+                        </CardContent>
+                    </Card>
 
-                    {report.article_details && (
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">{report.article_details.title}</h3>
-                        <p className="text-sm text-muted-foreground italic">
-                            <strong>Main Claim:</strong> {report.article_details.main_claim}
-                        </p>
-                      </div>
-                    )}
-
-                    {report.analysis && (
-                      <Accordion type="multiple" defaultValue={['factual-accuracy', 'source-reliability', 'bias-manipulation', 'recommendations', 'sources']} className="w-full">
-                        {report.analysis.factual_accuracy && <AnalysisSection title="Factual Accuracy" data={report.analysis.factual_accuracy.supporting_points} assessment={report.analysis.factual_accuracy.assessment} />}
-                        {report.analysis.source_reliability && <AnalysisSection title="Source Reliability" data={report.analysis.source_reliability.supporting_points} assessment={report.analysis.source_reliability.assessment} />}
-                        {report.analysis.bias_manipulation && <AnalysisSection title="Bias & Manipulation" data={report.analysis.bias_manipulation.supporting_points} assessment={report.analysis.bias_manipulation.assessment} />}
-                        
-                        {report.recommendations && (
-                          <AccordionItem value="recommendations">
-                              <AccordionTrigger>Recommendations</AccordionTrigger>
-                              <AccordionContent>
-                                  <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                      {report.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
-                                  </ul>
-                              </AccordionContent>
-                          </AccordionItem>
-                        )}
-
-                        {report.sources && report.sources.length > 0 && (
-                          <AccordionItem value="sources">
-                             <AccordionTrigger>
-                                <div className="flex items-center justify-between w-full">
-                                  <span>Sources Used</span>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                  {report.sources.map((source, i) => (
-                                    <li key={i}>
-                                      <Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                                        {source}
-                                      </Link>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </AccordionContent>
-                          </AccordionItem>
-                        )}
-                      </Accordion>
-                    )}
+                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content']} className="w-full">
+                      <AccordionItem value="reasoning">
+                        <AccordionTrigger>Reasoning</AccordionTrigger>
+                        <AccordionContent>
+                          <p className="text-sm text-muted-foreground">{report.reasoning}</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AnalysisSection title="Potential Biases" data={report.biases} />
+                      <AnalysisSection title="Flagged Content" data={report.flaggedContent} />
+                    </Accordion>
                   </div>
                 </ScrollArea>
               )}
