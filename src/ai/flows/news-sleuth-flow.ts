@@ -80,19 +80,20 @@ const prompt = ai.definePrompt({
   output: { schema: NewsSleuthOutputSchema },
   prompt: `You are an expert fake news detector. 
 Your job is to:
-1. Analyze the article content.
-2. Identify major claims in the article.
-3. Use the "webSearch" tool to find corroborating or contradicting evidence.
-4. Generate a credibility report including:
+1. Analyze the article content. If a URL is provided, use the getArticleContentFromUrl tool first. If that fails, base your report on the error.
+2. Identify the major claims in the article.
+3. For each major claim, use the "webSearch" tool to find corroborating or contradicting evidence.
+4. Generate a credibility report.
+5. In your reasoning, ONLY cite sources that come directly from the webSearch tool results. Do not invent or assume fact-checks if none were found. If the search tool returns no results, state that you could not find sufficient evidence to confirm or deny the claims and grade credibility as 'Uncertain'.
+
+Your report must include:
    - Overall credibility score (0-100).
    - Final verdict: "Likely Real", "Likely Fake", or "Uncertain".
    - A short summary of the article.
    - Potential biases.
    - Flagged low-credibility content.
-   - Reasoning that explains your analysis AND references to external sources.
-   - A list of external sources checked.
-
-If article text cannot be fetched, return verdict = "Uncertain" and score = 0.
+   - Reasoning that explains your analysis AND references the external sources you found.
+   - A list of the external source URLs you checked.
 
 {{#if articleText}}
 News Article Text:
@@ -120,19 +121,36 @@ const newsSleuthFlow = ai.defineFlow(
     outputSchema: NewsSleuthOutputSchema,
   },
   async (input) => {
-    let response = await prompt(input);
+    let llmResponse = await prompt(input);
 
+    // Loop to handle sequential tool calls (e.g., fetch then search)
     while (true) {
-      const toolRequest = response.toolRequest;
+      const toolRequest = llmResponse.toolRequest;
       if (!toolRequest) {
+        // No more tool requests, we have our final answer.
         break;
       }
       
       const toolResponse = await toolRequest.run();
-      response = await prompt(input, { toolResponse });
+      llmResponse = await prompt(input, { toolResponse });
     }
 
-    return response.output!;
+    if (!llmResponse.output) {
+      // Handle cases where the model fails to produce a structured output
+      return {
+        credibilityReport: {
+          overallScore: 0,
+          verdict: 'Uncertain',
+          summary: 'Analysis Error',
+          biases: [],
+          flaggedContent: [],
+          reasoning: 'The AI model did not produce a valid analysis report. This may be due to an issue with the input or a temporary model failure.',
+          sourcesChecked: [],
+        },
+      };
+    }
+
+    return llmResponse.output;
   }
 );
 
