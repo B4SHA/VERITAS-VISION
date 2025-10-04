@@ -44,7 +44,7 @@ export const ImageVerifierOutputSchema = z.object({
 });
 
 export type ImageVerifierInput = z.infer<typeof ImageVerifierInputSchema>;
-export type ImageVerifierOutput = z.infer<typeof ImageVerifierOutputSchema>;
+export type ImageVerifierOutput = z-infer<typeof ImageVerifierOutputSchema>;
 export type ImageVerifierError = { error: string; details?: string };
 
 
