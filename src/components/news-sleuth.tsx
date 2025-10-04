@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
-import type { NewsSleuthOutput, NewsSleuthError, AnalysisDetail } from "@/ai/schemas";
+import type { NewsSleuthOutput, NewsSleuthError } from "@/ai/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -151,19 +151,19 @@ export function NewsSleuth() {
     return "bg-primary";
   };
   
-  const AnalysisSection = ({ title, data }: { title: string, data: AnalysisDetail | undefined }) => {
+  const AnalysisSection = ({ title, data, assessment }: { title: string; data: string[]; assessment: string }) => {
     if (!data) return null;
     return (
         <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
         <AccordionTrigger>
             <div className="flex items-center justify-between w-full">
             <span>{title}</span>
-            <span className="text-sm font-medium text-muted-foreground">{data.assessment}</span>
+            <span className="text-sm font-medium text-muted-foreground">{assessment}</span>
             </div>
         </AccordionTrigger>
         <AccordionContent>
             <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                {data.supporting_points.map((point, i) => <li key={i}>{point}</li>)}
+                {data.map((point, i) => <li key={i}>{point}</li>)}
             </ul>
         </AccordionContent>
         </AccordionItem>
@@ -363,9 +363,9 @@ export function NewsSleuth() {
                       </div>
 
                       <Accordion type="multiple" defaultValue={['factual-accuracy', 'source-reliability', 'bias-manipulation', 'recommendations', 'sources']} className="w-full">
-                        <AnalysisSection title="Factual Accuracy" data={report.analysis.factual_accuracy} />
-                        <AnalysisSection title="Source Reliability" data={report.analysis.source_reliability} />
-                        <AnalysisSection title="Bias & Manipulation" data={report.analysis.bias_manipulation} />
+                        <AnalysisSection title="Factual Accuracy" data={report.analysis.factual_accuracy.supporting_points} assessment={report.analysis.factual_accuracy.assessment} />
+                        <AnalysisSection title="Source Reliability" data={report.analysis.source_reliability.supporting_points} assessment={report.analysis.source_reliability.assessment} />
+                        <AnalysisSection title="Bias & Manipulation" data={report.analysis.bias_manipulation.supporting_points} assessment={report.analysis.bias_manipulation.assessment} />
                         
                         <AccordionItem value="recommendations">
                             <AccordionTrigger>Recommendations</AccordionTrigger>
@@ -407,3 +407,4 @@ export function NewsSleuth() {
     </div>
   );
 }
+
