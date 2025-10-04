@@ -50,9 +50,14 @@ const NewsSleuthOutputJsonSchema = {
         "reasoning": {
             "type": "string",
             "description": "The reasoning behind the overall verdict and score."
+        },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A list of URLs to sources checked and cited for credibility analysis."
         }
     },
-    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
+    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
 };
 
 export async function newsSleuthAnalysis(
@@ -102,18 +107,31 @@ export async function newsSleuthAnalysis(
         if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
             responseText = responseText.substring(startIndex, endIndex + 1);
         }
-        const parsed = JSON.parse(responseText);
-        // The model nests the report, so we extract it.
-        output = parsed.credibilityReport || parsed;
+        output = JSON.parse(responseText);
     } catch(e) {
         console.error("Failed to parse JSON from model response:", responseText);
         throw new Error("The AI model returned an invalid JSON format. Please try again.");
     }
 
-    // Extract sources from grounding metadata
-    const metadata = response.candidates?.[0]?.groundingMetadata;
-    const searchResults = metadata?.groundingAttributions || [];
-    const sources = searchResults.map(attribution => attribution.web?.uri || '').filter(uri => !!uri);
+    // Extract sources from grounding metadata (Gemini API)
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    let sources: string[] = [];
+
+    if (groundingMetadata && Array.isArray(groundingMetadata.groundingAttributions)) {
+      sources = groundingMetadata.groundingAttributions
+        .map((a: any) => a.web?.uri)
+        .filter(Boolean);
+    }
+
+    // Optional: parse URLs directly mentioned in output.reasoning if sources is empty
+    if ((!sources || sources.length === 0) && output.reasoning) {
+      const urlRegex = /(https?:\/\/[^\s)]+)/g;
+      const found = output.reasoning.match(urlRegex);
+      if (found) {
+        sources = found.filter(Boolean);
+      }
+    }
+
 
     return { ...output, sources: sources };
   } catch (error: any) {
