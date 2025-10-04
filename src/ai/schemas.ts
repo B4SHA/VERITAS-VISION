@@ -16,7 +16,7 @@ export const NewsSleuthOutputSchema = z.object({
   biases: z.string().describe('An analysis of any detected biases (e.g., political, commercial).'),
   flaggedContent: z.array(z.string()).describe('A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims.'),
   reasoning: z.string().describe('The reasoning behind the overall verdict and score.'),
-  sources: z.array(z.string()).describe('A list of URLs used to corroborate facts. This MUST be populated from the search results.'),
+  sources: z.array(z.string()).optional().describe('A list of URLs used to corroborate facts. This is populated from search results.'),
 });
 
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;

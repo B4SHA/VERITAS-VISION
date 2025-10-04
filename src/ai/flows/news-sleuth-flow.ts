@@ -9,8 +9,6 @@
 
 import {
   GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
 } from '@google/generative-ai';
 import {
   NewsSleuthInputSchema,
@@ -23,13 +21,15 @@ import {
 
 async function runNewsSleuthAnalysis(
   input: NewsSleuthInput
-): Promise<NewsSleuthOutput> {
+): Promise<NewsSleuthOutput | NewsSleuthError> {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  
+  // Use a model that supports tool use
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
+    model: 'gemini-1.5-flash-latest',
+    tools: [{
+        googleSearch: {},
+    }],
   });
 
   const { articleText, articleUrl, articleHeadline, language } = input;
@@ -39,8 +39,9 @@ async function runNewsSleuthAnalysis(
   else if (articleHeadline) articleInfo = `Headline: "${articleHeadline}"`;
   
   const prompt = `
-    You are an advanced reasoning engine for detecting fake news. You MUST use your search capabilities to corroborate facts and find related stories.
+    You are an advanced reasoning engine for detecting fake news. You MUST use your search grounding tool to corroborate facts and find related stories.
     Generate a credibility report in ${language || 'en'}.
+    
     Your output MUST be a single JSON object that conforms to the following schema:
     {
       "type": "object",
@@ -50,55 +51,85 @@ async function runNewsSleuthAnalysis(
         "summary": { "type": "string", "description": "A brief summary of the article's main points and the analysis findings." },
         "biases": { "type": "string", "description": "An analysis of any detected biases (e.g., political, commercial)." },
         "flaggedContent": { "type": "array", "items": { "type": "string" }, "description": "A list of specific issues found, such as sensationalism or unverified claims." },
-        "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." },
-        "sources": { "type": "array", "items": { "type": "string" }, "description": "A list of URLs you used to corroborate facts. This MUST be populated from your search results." }
+        "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." }
       },
-      "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
+      "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
     }
+
+    Do not include the sources in the JSON. The sources will be derived from your tool calls.
 
     Analyze the following:
     ${articleInfo}
   `;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
-  
-  // The response is now guaranteed to be JSON because of responseMimeType.
-  const parsedJson = JSON.parse(responseText);
-
-  // Validate with Zod schema before returning
-  const validation = NewsSleuthOutputSchema.safeParse(parsedJson);
-  if (!validation.success) {
-    throw new Error(`AI returned invalid JSON structure: ${validation.error.message}`);
-  }
-
-  return validation.data;
-}
-
-
-export async function newsSleuthAnalysis(
-  input: NewsSleuthInput
-): Promise<NewsSleuthOutput | NewsSleuthError> {
   try {
-    const result = await runNewsSleuthAnalysis(input);
-    return result;
-  } catch (error: any) {
-    console.error('API Error:', error);
-    if (error.message.includes('SAFETY')) {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    let responseText = response.text();
+    
+    // Extract JSON from the response text
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+        responseText = jsonMatch[1];
+    }
+
+    let parsedJson;
+    try {
+        parsedJson = JSON.parse(responseText);
+    } catch (e) {
+        console.error("Failed to parse JSON:", responseText);
         return {
-          error: 'API_SAFETY_ERROR',
-          details: 'The analysis was blocked due to the content safety policy. The article may contain sensitive topics.',
+          error: 'INVALID_JSON',
+          details: 'The AI model returned an invalid JSON format.',
         };
     }
-     if (error.message.includes('invalid JSON')) {
+
+    const validation = NewsSleuthOutputSchema.safeParse(parsedJson);
+    if (!validation.success) {
+      console.error(`AI returned invalid JSON structure: ${validation.error.message}`);
       return {
         error: 'INVALID_JSON',
-        details: `The AI model returned an invalid JSON format. Details: ${error.message}`,
-      }
+        details: `The AI model returned an invalid JSON structure: ${validation.error.message}`,
+      };
+    }
+    
+    const output = validation.data;
+
+    // Extract sources from function calls
+    const functionCalls = response.functionCalls();
+    const sources: string[] = [];
+    if (functionCalls && functionCalls.length > 0) {
+        for (const call of functionCalls) {
+            if (call.name === 'googleSearch' && call.args && call.args.results) {
+                for (const result of call.args.results) {
+                    if (result.url) {
+                        sources.push(result.url);
+                    }
+                }
+            }
+        }
+    }
+    output.sources = sources;
+
+    return output;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    if (error.response && error.response.promptFeedback) {
+      return {
+        error: 'API_SAFETY_ERROR',
+        details: `The analysis was blocked due to a content safety policy: ${error.response.promptFeedback.blockReason}`,
+      };
     }
     return {
       error: 'API_EXECUTION_FAILED',
       details: error.message || 'The AI model failed to generate a response.',
     };
   }
+}
+
+export async function newsSleuthAnalysis(
+  input: NewsSleuthInput
+): Promise<NewsSleuthOutput | NewsSleuthError> {
+  const result = await runNewsSleuthAnalysis(input);
+  return result;
 }
