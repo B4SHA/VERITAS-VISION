@@ -2,23 +2,40 @@
 'use server';
 
 /**
- * @fileOverview A fake news detection AI agent.
- *
- * - newsSleuthAnalysis - A function that handles the news analysis process.
- * - NewsSleuthInput - The input type for the newsSleuthAnalysis function.
- * - NewsSleuthOutput - The return type for the newsSleuthAnalysis function.
+ * @fileOverview A fake news detection AI agent with web cross-verification.
  */
 
-import {ai} from '@/ai/genkit';
-import {getArticleContentFromUrl} from '@/services/url-fetcher';
-import {z} from 'genkit';
-import { NewsSleuthInputSchema, NewsSleuthOutputSchema, type NewsSleuthInput, type NewsSleuthOutput } from '@/ai/schemas';
+import { ai } from '@/ai/genkit';
+import { getArticleContentFromUrl } from '@/services/url-fetcher';
+import { runWebSearch } from '@/services/web-search';
+import { z } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
+// ---------------------- Schemas ----------------------
 
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-  return newsSleuthFlow(input);
-}
+const NewsSleuthInputSchema = z.object({
+  articleText: z.string().optional().describe('The text content of the news article to analyze.'),
+  articleUrl: z.string().url().optional().describe('The URL of the news article to analyze.'),
+  articleHeadline: z.string().optional().describe('The headline of the news article to analyze.'),
+}).refine(data => data.articleText || data.articleUrl || data.articleHeadline, {
+  message: 'One of article text, URL, or headline must be provided.',
+});
+export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
+
+const NewsSleuthOutputSchema = z.object({
+  credibilityReport: z.object({
+    overallScore: z.number().describe('An overall credibility score for the article (0-100).'),
+    verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final verdict on the news article\'s authenticity.'),
+    summary: z.string().describe('A brief summary of the article content.'),
+    biases: z.array(z.string()).describe('A list of potential biases identified in the article.'),
+    flaggedContent: z.array(z.string()).describe('Specific content flagged for low credibility.'),
+    reasoning: z.string().describe('The reasoning behind the credibility assessment, including cross-check results.'),
+    sourcesChecked: z.array(z.string()).optional().describe('List of external sources consulted.'),
+  }),
+});
+export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
+
+// ---------------------- Tools ----------------------
 
 const fetcherTool = ai.defineTool(
   {
@@ -35,44 +52,66 @@ const fetcherTool = ai.defineTool(
   async (input) => getArticleContentFromUrl(input.url)
 );
 
+const webSearchTool = ai.defineTool(
+  {
+    name: 'webSearch',
+    description: 'Search the web to find corroborating or contradicting evidence for the claims made in the article.',
+    inputSchema: z.object({
+      query: z.string().describe('A claim or headline to verify.'),
+    }),
+    outputSchema: z.object({
+      results: z.array(z.object({
+        title: z.string(),
+        snippet: z.string(),
+        url: z.string(),
+      })).describe('Search results with title, snippet, and URL.'),
+    }),
+  },
+  async (input) => runWebSearch(input.query)
+);
+
+// ---------------------- Prompt ----------------------
+
 const prompt = ai.definePrompt({
   name: 'newsSleuthPrompt',
   model: googleAI.model('gemini-2.5-flash'),
-  tools: [fetcherTool],
-  input: {schema: NewsSleuthInputSchema},
-  output: {schema: NewsSleuthOutputSchema},
-  prompt: `You are an expert in identifying fake news and assessing the credibility of news articles.
+  tools: [fetcherTool, webSearchTool],
+  input: { schema: NewsSleuthInputSchema },
+  output: { schema: NewsSleuthOutputSchema },
+  prompt: `You are an expert fake news detector. 
+Your job is to:
+1. Analyze the article content.
+2. Identify major claims in the article.
+3. Use the "webSearch" tool to find corroborating or contradicting evidence.
+4. Generate a credibility report including:
+   - Overall credibility score (0-100).
+   - Final verdict: "Likely Real", "Likely Fake", or "Uncertain".
+   - A short summary of the article.
+   - Potential biases.
+   - Flagged low-credibility content.
+   - Reasoning that explains your analysis AND references to external sources.
+   - A list of external sources checked.
 
-  Your goal is to analyze news information for potential biases, low credibility content, and overall trustworthiness. Provide a detailed report including:
-  1. An overall credibility score (0-100).
-  2. A final verdict of 'Likely Real', 'Likely Fake', or 'Uncertain'.
-  3. A brief summary of the article.
-  4. A list of potential biases identified.
-  5. Specific content flagged for low credibility.
-  6. The reasoning behind your assessment.
+If article text cannot be fetched, return verdict = "Uncertain" and score = 0.
 
-  The user has provided one of the following: the full text of a news article, its URL, or just its headline.
+{{#if articleText}}
+News Article Text:
+{{articleText}}
+{{/if}}
 
-  - If the user provides a URL, you MUST use the 'getArticleContentFromUrl' tool to fetch the article's text content first.
-  - If the tool returns an error, explain to the user that you were unable to retrieve the content from the URL and that they should try pasting the article text directly. In this case, set the verdict to 'Uncertain' and the score to 0.
-  - Your analysis should be based on the provided or fetched information.
+{{#if articleUrl}}
+News Article URL to analyze:
+{{articleUrl}}
+{{/if}}
 
-  {{#if articleText}}
-  News Article Text:
-  {{articleText}}
-  {{/if}}
-
-  {{#if articleUrl}}
-  News Article URL to analyze:
-  {{articleUrl}}
-  {{/if}}
-
-  {{#if articleHeadline}}
-  News Article Headline:
-  {{articleHeadline}}
-  {{/if}}
-  `,
+{{#if articleHeadline}}
+News Article Headline:
+{{articleHeadline}}
+{{/if}}
+`,
 });
+
+// ---------------------- Flow ----------------------
 
 const newsSleuthFlow = ai.defineFlow(
   {
@@ -81,35 +120,22 @@ const newsSleuthFlow = ai.defineFlow(
     outputSchema: NewsSleuthOutputSchema,
   },
   async (input) => {
-    const llmResponse = await prompt(input);
-    const toolRequest = llmResponse.toolRequests.find(
-      (req) => req.tool.name === 'getArticleContentFromUrl'
-    );
+    let response = await prompt(input);
 
-    if (toolRequest) {
-      const toolResponse = await toolRequest.run();
-      const articleContent = (toolResponse as any).textContent;
-      const fetchError = (toolResponse as any).error;
-
-      if (fetchError || !articleContent) {
-        return {
-          credibilityReport: {
-            overallScore: 0,
-            verdict: 'Uncertain',
-            summary: 'Could not analyze the article.',
-            biases: [],
-            flaggedContent: [],
-            reasoning: `I was unable to retrieve the content from the provided URL. The website may be blocking automated access, or the URL may be incorrect. Please try copying and pasting the article text directly for analysis. Error: ${fetchError || 'Could not extract article text.'}`,
-          },
-        };
+    while (true) {
+      const toolRequest = response.toolRequest;
+      if (!toolRequest) {
+        break;
       }
       
-      const finalInput = { ...input, articleText: articleContent };
-      const finalResponse = await prompt(finalInput);
-      return finalResponse.output!;
-
-    } else {
-        return llmResponse.output!;
+      const toolResponse = await toolRequest.run();
+      response = await prompt(input, { toolResponse });
     }
+
+    return response.output!;
   }
 );
+
+export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
+  return newsSleuthFlow(input);
+}
