@@ -18,7 +18,7 @@ import type {
 } from '@/ai/schemas';
 import { ai } from '@/ai/genkit';
 import { CREDIBILITY_REPORT_SCHEMA } from '@/ai/schemas';
-import { googleAI, googleSearch } from '@genkit-ai/google-genai';
+import { googleAI } from '@genkit-ai/google-genai';
 
 /**
  * Extracts source URIs from the Gemini grounding metadata.
@@ -74,7 +74,7 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
                 // IMPORTANT: Removed responseMimeType/responseSchema 
                 // to support the combination of tools and structured output.
             },
-            tools: [googleSearch],
+            tools: ['googleSearch'],
             system: systemPrompt,
         });
 
