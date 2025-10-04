@@ -57,15 +57,18 @@ async function runNewsSleuthAnalysis(
     // Step 2: Generate the final JSON report using the search results
     const finalPrompt = `
         You are an advanced reasoning engine for detecting fake news.
-        Based on the initial research summary below, and the provided source URLs, generate a final credibility report in ${language || 'en'}.
+        Based on the initial research summary and the provided source URLs below, generate a final credibility report in ${language || 'en'}.
 
         Initial Research Summary:
         ${searchSummary}
 
+        Sources Found:
+        ${sources.join('\n')}
+
         Original News Item:
         ${articleInfo}
         
-        Your output MUST be a single JSON object that conforms to the following schema:
+        Your output MUST be a single JSON object that conforms to the following schema. You must include the provided sources in the "sources" field of the JSON.
         {
           "type": "object",
           "properties": {
@@ -74,9 +77,10 @@ async function runNewsSleuthAnalysis(
             "summary": { "type": "string", "description": "A brief summary of the article's main points and the analysis findings." },
             "biases": { "type": "string", "description": "An analysis of any detected biases (e.g., political, commercial)." },
             "flaggedContent": { "type": "array", "items": { "type": "string" }, "description": "A list of specific issues found, such as sensationalism or unverified claims." },
-            "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." }
+            "reasoning": { "type": "string", "description": "The reasoning behind the overall verdict and score." },
+            "sources": { "type": "array", "items": { "type": "string" }, "description": "A list of URLs used to corroborate facts." }
           },
-          "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
+          "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
         }
     `;
 
@@ -112,7 +116,6 @@ async function runNewsSleuthAnalysis(
     }
     
     const output = validation.data;
-    output.sources = sources; // Add the sources from step 1
 
     return output;
 
