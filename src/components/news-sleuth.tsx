@@ -386,7 +386,7 @@ export function NewsSleuth() {
                                     {report.sources.map((source, i) => (
                                       <li key={i}>
                                         <Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-                                          {new URL(source).hostname}
+                                          {source}
                                         </Link>
                                       </li>
                                     ))}
@@ -405,3 +405,5 @@ export function NewsSleuth() {
     </div>
   );
 }
+
+    

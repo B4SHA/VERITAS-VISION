@@ -45,20 +45,37 @@ const NewsSleuthOutputJsonSchema = {
         "flaggedContent": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims."
+            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims. If no issues, return an empty array."
         },
         "reasoning": {
             "type": "string",
-            "description": "The reasoning behind the overall verdict and score."
+            "description": "The reasoning behind the overall verdict and score. You MUST cite the specific URLs of the sources you find via the search tool within this field."
         },
         "sources": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "A list of URLs to sources checked and cited for credibility analysis."
+          "description": "A list of all URLs to sources you checked and cited for credibility analysis. If no sources were found or used, return an empty array."
         }
     },
     "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning", "sources"]
 };
+
+async function unshortenUrl(url: string): Promise<string> {
+  // This is a simple unshortener that handles Google's redirect URLs.
+  if (url.startsWith('https://vertexaisearch.cloud.google.com/grounding-api-redirect/')) {
+    try {
+      // Use a HEAD request to be more efficient as we only need the final URL from headers
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      return response.url;
+    } catch (error) {
+      // If fetching fails, return the original URL
+      console.error(`Failed to unshorten URL: ${url}`, error);
+      return url;
+    }
+  }
+  return url;
+}
+
 
 export async function newsSleuthAnalysis(
   input: NewsSleuthInput
@@ -119,18 +136,28 @@ export async function newsSleuthAnalysis(
     let sources: string[] = [];
 
     if (groundingMetadata && Array.isArray(groundingMetadata.groundingAttributions)) {
-      sources = groundingMetadata.groundingAttributions
+      const redirectUrls = groundingMetadata.groundingAttributions
         .map((a: any) => a.web?.uri)
         .filter(Boolean);
+      // Resolve redirect URLs to get the final destination
+      sources = await Promise.all(redirectUrls.map(url => unshortenUrl(url)));
     }
 
-    // Optional: parse URLs directly mentioned in output.reasoning if sources is empty
+
+    // Fallback: parse URLs directly mentioned in output.reasoning if sources is empty
     if ((!sources || sources.length === 0) && output.reasoning) {
       const urlRegex = /(https?:\/\/[^\s)]+)/g;
       const found = output.reasoning.match(urlRegex);
       if (found) {
-        sources = found.filter(Boolean);
+        // Use a Set to get unique URLs, then convert back to an array
+        sources = Array.from(new Set(found.filter(Boolean)));
       }
+    }
+    
+    // Also add any sources the model put directly in its output
+    if(output.sources && output.sources.length > 0) {
+        const combinedSources = new Set([...sources, ...output.sources]);
+        sources = Array.from(combinedSources);
     }
 
 
@@ -143,3 +170,5 @@ export async function newsSleuthAnalysis(
     };
   }
 }
+
+    
