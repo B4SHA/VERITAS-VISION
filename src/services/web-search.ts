@@ -17,28 +17,16 @@ export async function runWebSearch(query: string): Promise<{ results: { title: s
   const API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
   const CX = process.env.GOOGLE_SEARCH_CX;
 
-  if (!API_KEY || !CX) {
-    console.error("Google Search API Key or CX is not set. Returning mock data.");
-    // Return mock data or an empty array if the API keys are not configured.
-    return { 
-        results: [
-            {
-                title: "Setup Required: Google Search API",
-                snippet: "The web search tool is not configured. Please provide GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX environment variables to enable live web searches.",
-                url: "#"
-            }
-        ]
-    };
-  }
-
+  // If the keys are not set, the API call will fail, and the flow will report an error,
+  // which is the desired behavior for the user to debug their setup.
   const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${CX}&q=${encodeURIComponent(query)}`;
   
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      console.error('Google Search API request failed:', response.status, response.statusText);
-      const errorBody = await response.text();
-      console.error('Error Body:', errorBody);
+      const errorBody = await response.json();
+      console.error('Google Search API request failed:', response.status, response.statusText, errorBody);
+      // Return an empty array so the flow can continue and report that no sources were found.
       return { results: [] };
     }
 
@@ -57,6 +45,7 @@ export async function runWebSearch(query: string): Promise<{ results: { title: s
     return { results };
   } catch (error) {
     console.error('Error calling Google Search API:', error);
+    // Return an empty array in case of a network error.
     return { results: [] };
   }
 }
