@@ -46,8 +46,8 @@ async function runNewsSleuthAnalysis(
         for (const call of functionCalls) {
             if (call.name === 'googleSearch' && call.args && Array.isArray(call.args.results)) {
                 for (const searchResult of call.args.results) {
-                    if (searchResult.url) {
-                        sources.push(searchResult.url);
+                    if (searchResult.link) {
+                        sources.push(searchResult.link);
                     }
                 }
             }
