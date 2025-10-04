@@ -6,20 +6,20 @@ export const NewsSleuthInputSchema = z.object({
   articleText: z.string().optional().describe('The text content of the news article to analyze.'),
   articleUrl: z.string().url().optional().describe('The URL of the news article to analyze.'),
   articleHeadline: z.string().optional().describe('The headline of the news article to analyze.'),
+  language: z.string().describe('The language of the analysis, specified as a two-letter ISO 639-1 code (e.g., "en", "hi").'),
 }).refine(data => data.articleText || data.articleUrl || data.articleHeadline, {
   message: 'One of article text, URL, or headline must be provided.',
 });
 export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
 
 export const NewsSleuthOutputSchema = z.object({
-  credibilityReport: z.object({
-    overallScore: z.number().describe('An overall credibility score for the article (0-100).'),
-    verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final verdict on the news article\'s authenticity.'),
-    summary: z.string().describe('A brief summary of the article content.'),
-    biases: z.array(z.string()).describe('A list of potential biases identified in the article.'),
-    flaggedContent: z.array(z.string()).describe('Specific content flagged for low credibility.'),
-    reasoning: z.string().describe('The reasoning behind the credibility assessment.'),
-  }),
+  overallScore: z.number().describe('An overall credibility score for the article (0-100).'),
+  verdict: z.string().describe('The final verdict on the news article\'s authenticity.'),
+  summary: z.string().describe('A brief summary of the article content.'),
+  biases: z.string().describe('A list of potential biases identified in the article.'),
+  flaggedContent: z.array(z.string()).describe('Specific content flagged for low credibility.'),
+  reasoning: z.string().describe('The reasoning behind the credibility assessment.'),
+  sources: z.array(z.string()).optional().describe('List of external sources consulted.'),
 });
 export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 export type NewsSleuthError = { error: string; details?: string };

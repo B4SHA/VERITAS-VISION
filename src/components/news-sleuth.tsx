@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { newsSleuthAnalysis } from "@/ai/flows/news-sleuth-flow";
@@ -152,28 +152,15 @@ export function NewsSleuth() {
     return "bg-primary";
   };
   
-  const getVerdictBadgeVariant = (verdict: string) => {
+  const getVerdictBadgeVariant = (verdict: string = "") => {
     const lowerVerdict = verdict.toLowerCase();
     if (lowerVerdict.includes('real')) return 'default';
-    if (lowerVerdict.includes('fake')) return 'destructive';
-    return 'secondary';
+    if (lowerVerdict.includes('fake') || lowerVerdict.includes('propaganda')) return 'destructive';
+    if (lowerVerdict.includes('uncertain')) return 'secondary';
+    return 'outline';
   };
 
-  const AnalysisSection = ({ title, data }: { title: string; data: string[] }) => {
-    if (!data || data.length === 0) return null;
-    return (
-        <AccordionItem value={title.toLowerCase().replace(/\s/g, '-')}>
-          <AccordionTrigger>{title}</AccordionTrigger>
-          <AccordionContent>
-              <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                  {data.map((point, i) => <li key={i}>{point}</li>)}
-              </ul>
-          </AccordionContent>
-        </AccordionItem>
-    );
-  };
-
-  const report = result?.credibilityReport;
+  const report = result;
 
   return (
     <div className="w-full flex-1 bg-gradient-to-br from-background to-muted/40 py-8 px-4">
@@ -363,15 +350,39 @@ export function NewsSleuth() {
                         </CardContent>
                     </Card>
 
-                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content']} className="w-full">
+                    <Accordion type="multiple" defaultValue={['reasoning', 'biases', 'flagged-content', 'sources-checked']} className="w-full">
                       <AccordionItem value="reasoning">
                         <AccordionTrigger>Reasoning</AccordionTrigger>
                         <AccordionContent>
                           <p className="text-sm text-muted-foreground">{report.reasoning}</p>
                         </AccordionContent>
                       </AccordionItem>
-                      <AnalysisSection title="Potential Biases" data={report.biases} />
-                      <AnalysisSection title="Flagged Content" data={report.flaggedContent} />
+                      <AccordionItem value="biases">
+                        <AccordionTrigger>Bias Analysis</AccordionTrigger>
+                        <AccordionContent>
+                          <p className="text-sm text-muted-foreground">{report.biases}</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                      {report.flaggedContent && report.flaggedContent.length > 0 && (
+                        <AccordionItem value="flagged-content">
+                            <AccordionTrigger>Flagged Content</AccordionTrigger>
+                            <AccordionContent>
+                                <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                                    {report.flaggedContent.map((point, i) => <li key={i}>{point}</li>)}
+                                </ul>
+                            </AccordionContent>
+                        </AccordionItem>
+                      )}
+                      {report.sources && report.sources.length > 0 && (
+                        <AccordionItem value="sources-checked">
+                            <AccordionTrigger>Sources Checked</AccordionTrigger>
+                            <AccordionContent>
+                                <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                                    {report.sources.map((source, i) => <li key={i}><Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{new URL(source).hostname}</Link></li>)}
+                                </ul>
+                            </AccordionContent>
+                        </AccordionItem>
+                      )}
                     </Accordion>
                   </div>
                 </ScrollArea>

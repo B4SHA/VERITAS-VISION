@@ -1,160 +1,125 @@
 
 'use server';
-
 /**
- * @fileOverview A fake news detection AI agent with web cross-verification.
+ * @fileOverview A news article credibility analysis AI agent using the direct Gemini API.
+ *
+ * This file defines the server-side logic for the News Sleuth feature, which
+ * analyzes news articles for credibility by calling the Gemini API directly.
  */
 
-import { ai } from '@/ai/genkit';
-import { getArticleContentFromUrl } from '@/services/url-fetcher';
-import { runWebSearch } from '@/services/web-search';
-import { z } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  type NewsSleuthInput,
+  type NewsSleuthOutput,
+  type NewsSleuthError,
+} from '@/ai/schemas';
 
-// ---------------------- Schemas ----------------------
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error('Missing GEMINI_API_KEY environment variable');
+}
 
-const NewsSleuthInputSchema = z.object({
-  articleText: z.string().optional().describe('The text content of the news article to analyze.'),
-  articleUrl: z.string().url().optional().describe('The URL of the news article to analyze.'),
-  articleHeadline: z.string().optional().describe('The headline of the news article to analyze.'),
-}).refine(data => data.articleText || data.articleUrl || data.articleHeadline, {
-  message: 'One of article text, URL, or headline must be provided.',
-});
-export type NewsSleuthInput = z.infer<typeof NewsSleuthInputSchema>;
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-const NewsSleuthOutputSchema = z.object({
-  credibilityReport: z.object({
-    overallScore: z.number().describe('An overall credibility score for the article (0-100).'),
-    verdict: z.enum(['Likely Real', 'Likely Fake', 'Uncertain']).describe('The final verdict on the news article\'s authenticity.'),
-    summary: z.string().describe('A brief summary of the article content.'),
-    biases: z.array(z.string()).describe('A list of potential biases identified in the article.'),
-    flaggedContent: z.array(z.string()).describe('Specific content flagged for low credibility.'),
-    reasoning: z.string().describe('The reasoning behind the credibility assessment, including cross-check results.'),
-    sourcesChecked: z.array(z.string()).optional().describe('List of external sources consulted.'),
-  }),
-});
-export type NewsSleuthOutput = z.infer<typeof NewsSleuthOutputSchema>;
 
-// ---------------------- Tools ----------------------
-
-const fetcherTool = ai.defineTool(
-  {
-    name: 'getArticleContentFromUrl',
-    description: 'Fetches the text content of a news article from a given URL. Use this tool if the user provides a URL.',
-    inputSchema: z.object({
-      url: z.string().url().describe('The URL of the news article to fetch.'),
-    }),
-    outputSchema: z.object({
-      textContent: z.string().describe('The extracted text content of the article.'),
-      error: z.string().optional().describe('An error message if fetching failed.'),
-    }),
-  },
-  async (input) => getArticleContentFromUrl(input.url)
-);
-
-const webSearchTool = ai.defineTool(
-  {
-    name: 'webSearch',
-    description: 'Search the web to find corroborating or contradicting evidence for the claims made in the article.',
-    inputSchema: z.object({
-      query: z.string().describe('A claim or headline to verify.'),
-    }),
-    outputSchema: z.object({
-      results: z.array(z.object({
-        title: z.string(),
-        snippet: z.string(),
-        url: z.string(),
-      })).describe('Search results with title, snippet, and URL.'),
-    }),
-  },
-  async (input) => runWebSearch(input.query)
-);
-
-// ---------------------- Prompt ----------------------
-
-const prompt = ai.definePrompt({
-  name: 'newsSleuthPrompt',
-  model: googleAI.model('gemini-2.5-flash'),
-  tools: [fetcherTool, webSearchTool],
-  input: { schema: NewsSleuthInputSchema },
-  output: { schema: NewsSleuthOutputSchema },
-  prompt: `You are an expert fake news detector. 
-Your job is to:
-1. Analyze the article content. If a URL is provided, you MUST use the getArticleContentFromUrl tool first. If the tool returns an error, your report should state that the content could not be fetched and why.
-2. Identify the major claims in the article.
-3. For each major claim, use the "webSearch" tool to find corroborating or contradicting evidence.
-4. Generate a credibility report.
-5. In your reasoning, ONLY cite sources that come directly from the webSearch tool results. Do not invent or assume fact-checks if none were found. If the search tool returns no results or an error, state that you could not find sufficient evidence to confirm or deny the claims and grade credibility as 'Uncertain'.
-6. IMPORTANT: Do NOT make any comments about the current date or whether the article's date is in the future. Base your analysis only on the content and the search results.
-
-Your report must include:
-   - Overall credibility score (0-100).
-   - Final verdict: "Likely Real", "Likely Fake", or "Uncertain".
-   - A short summary of the article.
-   - Potential biases.
-   - Flagged low-credibility content.
-   - Reasoning that explains your analysis AND references the external sources you found.
-   - A list of the external source URLs you checked.
-
-{{#if articleText}}
-News Article Text:
-{{articleText}}
-{{/if}}
-
-{{#if articleUrl}}
-News Article URL to analyze:
-{{articleUrl}}
-{{/if}}
-
-{{#if articleHeadline}}
-News Article Headline:
-{{articleHeadline}}
-{{/if}}
-`,
-});
-
-// ---------------------- Flow ----------------------
-
-const newsSleuthFlow = ai.defineFlow(
-  {
-    name: 'newsSleuthFlow',
-    inputSchema: NewsSleuthInputSchema,
-    outputSchema: NewsSleuthOutputSchema,
-  },
-  async (input) => {
-    let llmResponse = await prompt(input);
-
-    // Loop to handle sequential tool calls (e.g., fetch then search)
-    while (true) {
-      const toolRequest = llmResponse.toolRequest;
-      if (!toolRequest) {
-        // No more tool requests, we have our final answer.
-        break;
-      }
-      
-      const toolResponse = await toolRequest.run();
-      llmResponse = await prompt(input, { toolResponse });
-    }
-
-    if (!llmResponse.output) {
-      // Handle cases where the model fails to produce a structured output
-      return {
-        credibilityReport: {
-          overallScore: 0,
-          verdict: 'Uncertain',
-          summary: 'Analysis Error',
-          biases: [],
-          flaggedContent: [],
-          reasoning: 'The AI model did not produce a valid analysis report. This may be due to an issue with the input or a temporary model failure.',
-          sourcesChecked: [],
+const NewsSleuthOutputJsonSchema = {
+    "type": "object",
+    "properties": {
+        "overallScore": {
+            "type": "number",
+            "description": "A credibility score from 0 to 100."
         },
-      };
+        "verdict": {
+            "type": "string",
+            "enum": ['Likely Real', 'Likely Fake', 'Uncertain', 'Propaganda/Disinformation', 'Satire/Parody', 'Sponsored Content', 'Opinion/Analysis'],
+            "description": "The final judgment on the article's credibility."
+        },
+        "summary": {
+            "type": "string",
+            "description": "A brief summary of the article's main points."
+        },
+        "biases": {
+            "type": "string",
+            "description": "An analysis of any detected biases (e.g., political, commercial)."
+        },
+        "flaggedContent": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "A list of specific issues found, such as sensationalism, logical fallacies, or unverified claims."
+        },
+        "reasoning": {
+            "type": "string",
+            "description": "The reasoning behind the overall verdict and score."
+        }
+    },
+    "required": ["overallScore", "verdict", "summary", "biases", "flaggedContent", "reasoning"]
+};
+
+export async function newsSleuthAnalysis(
+  input: NewsSleuthInput
+): Promise<NewsSleuthOutput | NewsSleuthError> {
+  let articleInfo = '';
+  if (input.articleText) articleInfo += `Full Text: ${input.articleText}\n`;
+  if (input.articleHeadline) articleInfo += `Headline: ${input.articleHeadline}\n`;
+  if (input.articleUrl) articleInfo += `URL: ${input.articleUrl}\n`;
+
+  const prompt = `
+    You are a world-class investigative journalist and fact-checker AI.
+    Your task is to analyze the provided article information for credibility and generate a report.
+    
+    1.  If a URL is provided in the Article Info, you MUST use the Google Search tool to fetch its content and analyze it. Do not analyze the URL string itself.
+    2.  Use the Google Search tool to find corroborating or contradictory sources for the claims made in the article. The search must be performed in the specified language: ${input.language}.
+    3.  Identify any biases (political, commercial, etc.), sensationalism, or logical fallacies.
+    4.  Provide an overall credibility score from 0 (completely untrustworthy) to 100 (highly credible).
+    5.  You MUST output your final report in ${input.language}.
+    6.  Your entire response MUST be a single, valid JSON object that strictly adheres to the following JSON schema. Do not include any other text, explanations, or markdown formatting like \`\`\`json.
+    
+    JSON Schema: ${JSON.stringify(NewsSleuthOutputJsonSchema)}
+
+    Article Info:
+    ${articleInfo}
+  `;
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+    });
+
+    const response = result.response;
+    let responseText = response.text();
+
+    if (!responseText) {
+        throw new Error("The AI model returned an empty response.");
+    }
+    
+    let output: NewsSleuthOutput;
+    try {
+        // Find the start and end of the JSON object
+        const startIndex = responseText.indexOf('{');
+        const endIndex = responseText.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            responseText = responseText.substring(startIndex, endIndex + 1);
+        }
+        const parsed = JSON.parse(responseText);
+        // The model nests the report, so we extract it.
+        output = parsed.credibilityReport || parsed;
+    } catch(e) {
+        console.error("Failed to parse JSON from model response:", responseText);
+        throw new Error("The AI model returned an invalid JSON format. Please try again.");
     }
 
-    return llmResponse.output;
-  }
-);
+    // Extract sources from grounding metadata
+    const metadata = response.candidates?.[0]?.groundingMetadata;
+    const searchResults = metadata?.groundingAttributions || [];
+    const sources = searchResults.map(attribution => attribution.web?.uri || '').filter(uri => !!uri);
 
-export async function newsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput> {
-  return newsSleuthFlow(input);
+    return { ...output, sources: sources };
+  } catch (error: any) {
+    console.error('API Error:', error);
+    return {
+      error: 'API_EXECUTION_FAILED',
+      details: error.message || 'The AI model failed to generate a response.',
+    };
+  }
 }
