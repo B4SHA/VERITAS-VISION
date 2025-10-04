@@ -86,7 +86,7 @@ const extractSources = (response: any): string[] => {
     if (groundingMetadata && groundingMetadata.groundingAttributions) {
         sources = groundingMetadata.groundingAttributions
             .map((attr: any) => attr.web?.uri)
-            .filter(Boolean); // Filter out any null/undefined URIs
+            .filter((uri: string) => uri);
     }
     return sources;
 };
@@ -120,22 +120,16 @@ const exponentialBackoffFetch = async (url: string, options: RequestInit, maxRet
 async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuthOutput | NewsSleuthError> {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash',
-        systemInstruction: `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
-    
-        **Instructions:**
-        1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item.
-        2. **STRICTLY** adhere to the JSON schema provided in the user prompt for your final output. Your entire output must be a single JSON object.
-        3. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
-        4. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
-        5. Generate the entire report in the ${input.language || 'English'} language.`
+        model: 'gemini-2.5-flash'
     });
 
-    const { articleText, articleUrl, articleHeadline } = input;
+    const { articleText, articleUrl, articleHeadline, language } = input;
     
+    // 1. Construct the most specific query for the AI to use
     let articleInfo = '';
     if (articleUrl) {
-        articleInfo = `the article found at this URL: ${articleUrl}. You MUST use your search tool to verify and fetch the content from this URL.`;
+        // Instruct the AI to use search tool to access the URL content
+        articleInfo = `the article found at this URL: ${articleUrl}. The AI MUST use its search tool to verify and fetch the content from this URL.`;
     } else if (articleText) {
         articleInfo = `the following article text: "${articleText}"`;
     } else if (articleHeadline) {
@@ -144,27 +138,74 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
         return { error: 'INVALID_INPUT', details: 'No URL, text, or headline was provided for analysis.' };
     }
 
-    const prompt = `Analyze the credibility of ${articleInfo}. Your output MUST be a single JSON object that conforms to the following schema: ${JSON.stringify(CREDIBILITY_REPORT_SCHEMA)}`;
+    // 2. Define System and User Prompts
+    const systemPrompt = `You are a world-class investigative journalist AI specializing in debunking fake news and analyzing media bias. Your task is to perform a detailed credibility check on the provided news item.
+    
+    **Instructions:**
+    1. **USE GOOGLE SEARCH GROUNDING** to find context, corroborating sources, and the content of the news item.
+    2. **STRICTLY** adhere to the following JSON schema and format your entire output as a single JSON object.
+    3. **YOUR FINAL OUTPUT MUST BE THE JSON OBJECT WRAPPED IN A MARKDOWN CODE BLOCK LIKE THIS: \`\`\`json\n{...}\n\`\`\`**
+    4. All assessments and reasoning must be based only on the facts and sources retrieved via your search tool.
+    5. The analysis should be sharp, objective, and focus on factual accuracy, source transparency, and manipulative language.
+    6. Generate the entire report in the ${language || 'English'} language.`;
 
+    const userPrompt = `Analyze the credibility of ${articleInfo}. Your output MUST be a single JSON object that conforms to the following schema: ${JSON.stringify(CREDIBILITY_REPORT_SCHEMA)}`;
+
+    // 3. Construct the API Payload (Removed MimeType and Schema for tool use compatibility)
+    const payload = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        tools: [{"googleSearch": {}}], // Corrected tool name
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+        // IMPORTANT: Removed generationConfig.responseMimeType/responseSchema 
+        // to support the combination of tools and structured output.
+    };
+
+    // 4. Call the API and Parse the Markdown-wrapped JSON
     try {
-        const result = await model.generateContent({
-            contents: [{ parts: [{ text: prompt }] }],
-            tools: [{ "googleSearch": {} }],
-        });
-        
+        const result = await model.generateContent(payload);
         const response = result.response;
-        
+
         if (response.candidates && response.candidates.length > 0 && response.candidates[0].content?.parts?.[0]?.text) {
-            const jsonText = response.candidates[0].content.parts[0].text;
+            const rawText = response.candidates[0].content.parts[0].text;
+            let jsonText = ''; 
+            
+            // 4a. Attempt to extract JSON from ```json ... ``` markdown block (most reliable way)
+            const markdownMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
+            if (markdownMatch && markdownMatch[1]) {
+                jsonText = markdownMatch[1].trim();
+            } else {
+                // 4b. Fallback: Search for the first '{' and last '}'
+                const startIndex = rawText.indexOf('{');
+                const endIndex = rawText.lastIndexOf('}');
+                
+                if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+                    jsonText = rawText.substring(startIndex, endIndex + 1);
+                } else {
+                    // If no JSON block is found at all, we can't parse it.
+                    console.error("No JSON block or curly braces found in AI response.");
+                    return { 
+                        error: 'INVALID_JSON_BLOCK', 
+                        details: 'The AI response did not contain the expected JSON markdown block or curly braces.',
+                    };
+                }
+            }
+            
             let parsedData: NewsSleuthOutput;
             
             try {
+                // 4c. Attempt to parse the cleaned JSON string
                 parsedData = JSON.parse(jsonText);
             } catch (e) {
-                console.error("Failed to parse JSON:", jsonText);
-                return { error: 'INVALID_JSON', details: 'The AI model returned an invalid JSON format, preventing structural parsing.' };
+                console.error("Failed to parse JSON string:", jsonText);
+                return { 
+                    error: 'INVALID_JSON_FORMAT', 
+                    details: 'The AI model returned text that could not be parsed as valid JSON after extraction.',
+                };
             }
 
+            // Extract sources from the grounding metadata in the original response
             const fetchedSources = extractSources(response);
 
             // Attach sources and return the validated data
@@ -177,9 +218,8 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
             return { error: 'AI_FAILURE', details: `AI content generation failed. Reason: ${blockReason}` };
         }
 
-    } catch (e: any)       {
+    } catch (e: any) {
         console.error("API or Network Error:", e);
-        // Check for the specific error message and provide a more user-friendly response.
         if (e.message && e.message.includes("is unsupported")) {
             return { error: 'API_CONFIG_ERROR', details: "The current AI configuration doesn't support the combination of features being requested. Please contact support." };
         }
@@ -188,3 +228,5 @@ async function runNewsSleuthAnalysis(input: NewsSleuthInput): Promise<NewsSleuth
 };
 
 export { runNewsSleuthAnalysis as newsSleuthAnalysis };
+
+    
