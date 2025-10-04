@@ -378,7 +378,13 @@ export function NewsSleuth() {
                             <AccordionTrigger>Sources Checked</AccordionTrigger>
                             <AccordionContent>
                                 <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                                    {report.sources.map((source, i) => <li key={i}><Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{new URL(source).hostname}</Link></li>)}
+                                    {report.sources.map((source, i) => (
+                                      <li key={i}>
+                                        <Link href={source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                                          {new URL(source).hostname}
+                                        </Link>
+                                      </li>
+                                    ))}
                                 </ul>
                             </AccordionContent>
                         </AccordionItem>
