@@ -79,8 +79,6 @@ You will need a Google Gemini API key to use the AI features.
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
     ```
 
-    **Note**: The News Sleuth tool uses the Gemini API's built-in Google Search tool, which is enabled by default for Gemini 1.5 Pro. If you wish to expand or customize search capabilities further, you would need to set up a Custom Search Engine and use `GOOGLE_SEARCH_API_KEY` and `GOOGLE_SEARCH_CX`, but this is not required for the default functionality.
-
 ### 4. Run the Development Server
 Start the Next.js development server:
 ```bash
